@@ -1,0 +1,32 @@
+# Dependências
+node_modules/
+
+# Variáveis de Ambiente e Senhas (Muito Importante!)
+.env
+.env.*
+!.env.example
+
+# Logs do Node/NPM
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Arquivos do Sistema Operacional
+.DS_Store
+Thumbs.db
+
+# Configurações de IDEs e Editores (VS Code, etc)
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Pastas de build/coverage (se formos usar no futuro)
+dist/
+build/
+coverage/
