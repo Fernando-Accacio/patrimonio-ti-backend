@@ -23,6 +23,28 @@ exports.listAll = async (req, res) => {
   } catch (e) { res.status(500).send({ error: e.message }); }
 };
 
+exports.updateRole = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { role } = req.body;
+    const { User } = require('../../../infra/db/sequelize/models');
+
+    if (parseInt(id) === req.user.id) {
+      return res.status(400).send({ error: 'Operação negada: Você não pode alterar o seu próprio cargo.' });
+    }
+
+    const usuario = await User.findByPk(id);
+    if (!usuario) {
+      return res.status(404).send({ error: 'Usuário não encontrado.' });
+    }
+
+    await User.update({ role }, { where: { id } });
+    return res.send({ message: 'Nível de acesso atualizado com sucesso.' });
+  } catch (e) {
+    res.status(500).send({ error: e.message });
+  }
+};
+
 exports.delete = async (req, res) => {
   try {
     const { id } = req.params;

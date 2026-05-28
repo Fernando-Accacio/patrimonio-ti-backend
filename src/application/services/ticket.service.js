@@ -3,23 +3,25 @@ const equipmentRepository = require('../../infra/db/sequelize/repository/equipme
 
 class TicketService {
   async openTicket(data) {
-    // O usuário enviou o número do patrimônio, precisamos achar o ID do equipamento
-    const equipment = await equipmentRepository.findByPatrimonio(data.patrimonio);
+    let equipment = await equipmentRepository.findByPatrimonio(data.patrimonio);
     
     if (!equipment) {
-      throw new Error('Equipamento com este patrimônio não foi encontrado na base.');
+      equipment = await equipmentRepository.create({
+        patrimonio: data.patrimonio,
+        tipo: data.tipo,              
+        status: 'Em Manutenção',
+        observacao: data.localizacao  
+      });
+    } else {
+      await equipmentRepository.update(equipment.id, { status: 'Em Manutenção' });
     }
 
-    // Monta o objeto final para salvar no banco
     const ticketData = {
       descricao_problema: data.descricao_problema,
       equipment_id: equipment.id,
-      user_id: data.user_id, // Vem do token do usuário logado
+      user_id: data.user_id,
       status_chamado: 'Aberto'
     };
-
-    // Atualiza o status do equipamento para 'Em Manutenção' automaticamente
-    await equipmentRepository.update(equipment.id, { status: 'Em Manutenção' });
 
     return await ticketRepository.create(ticketData);
   }
@@ -28,18 +30,35 @@ class TicketService {
     return await ticketRepository.findAll();
   }
 
-  async resolveTicket(id, resolucao_ti) {
+  async updateTicketDescription(id, descricao_problema) {
     const ticket = await ticketRepository.findById(id);
     if (!ticket) throw new Error('Chamado não encontrado.');
 
-    // Atualiza o chamado para concluído
+    if (ticket.status_chamado === 'Concluído') {
+      throw new Error('Operação negada: Chamados concluídos não podem ser editados.');
+    }
+
+    return await ticketRepository.update(id, { descricao_problema });
+  }
+
+  async updateTicketStatus(id, status_chamado, resolucao_ti) {
+    const ticket = await ticketRepository.findById(id);
+    if (!ticket) throw new Error('Chamado não encontrado.');
+
     const updatedTicket = await ticketRepository.update(id, {
-      status_chamado: 'Concluído',
-      resolucao_ti
+      status_chamado,
+      resolucao_ti: resolucao_ti || ticket.resolucao_ti 
     });
 
-    // Devolve o equipamento para o status 'Disponível' ou 'Em Uso'
-    await equipmentRepository.update(ticket.equipment_id, { status: 'Disponível' });
+    let equipamentoStatus = 'Em Manutenção';
+    
+    if (status_chamado === 'Concluído') {
+      equipamentoStatus = 'Disponível';
+    } else if (status_chamado === 'Baixa') {
+      equipamentoStatus = 'Baixa';
+    }
+
+    await equipmentRepository.update(ticket.equipment_id, { status: equipamentoStatus });
 
     return updatedTicket;
   }

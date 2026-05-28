@@ -22,6 +22,18 @@ exports.resolve = async (req, res) => {
   } catch (e) { res.status(400).send({ error: e.message }); }
 };
 
+exports.update = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { descricao_problema } = req.body;
+    
+    const ticketAtualizado = await ticketService.updateTicketDescription(id, descricao_problema);
+    return res.send(ticketAtualizado);
+  } catch (e) { 
+    res.status(400).send({ error: e.message }); 
+  }
+};
+
 exports.listMyTickets = async (req, res) => {
   try {
     const userId = req.user.id;
@@ -32,4 +44,16 @@ exports.listMyTickets = async (req, res) => {
     });
     return res.send(tickets);
   } catch (e) { res.status(500).send({ error: e.message }); }
+};
+
+exports.updateStatus = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status_chamado, resolucao_ti } = req.body;
+    
+    const ticket = await ticketService.updateTicketStatus(id, status_chamado, resolucao_ti);
+    return res.send(ticket);
+  } catch (e) { 
+    res.status(400).send({ error: e.message }); 
+  }
 };

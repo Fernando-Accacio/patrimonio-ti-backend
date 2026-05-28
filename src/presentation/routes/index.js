@@ -94,6 +94,26 @@ const routes = async (fastify, options) => {
     }
   }, userController.listAll);
 
+  fastify.patch('/users/:id/role', {
+    preHandler: [authenticate, isAdmin],
+    schema: {
+      description: 'Altera o nível de acesso (Role) de um funcionário da prefeitura.',
+      tags: ['Usuários'],
+      params: {
+        type: 'object',
+        required: ['id'],
+        properties: { id: { type: 'integer' } }
+      },
+      body: {
+        type: 'object',
+        required: ['role'],
+        properties: {
+          role: { type: 'string', enum: ['ADMIN', 'USER'] }
+        }
+      }
+    }
+  }, userController.updateRole);
+
   fastify.delete('/users/:id', {
     preHandler: [authenticate, isAdmin],
     schema: {
@@ -203,19 +223,21 @@ const routes = async (fastify, options) => {
       tags: ['Chamados'],
       body: {
         type: 'object',
-        required: ['patrimonio', 'descricao_problema'],
+        required: ['patrimonio', 'descricao_problema', 'tipo', 'localizacao'],
         properties: {
           patrimonio: { type: 'string' },
-          descricao_problema: { type: 'string' }
+          descricao_problema: { type: 'string' },
+          tipo: { type: 'string' },        
+          localizacao: { type: 'string' }   
         }
       }
     }
   }, ticketController.open);
 
-  fastify.patch('/tickets/:id/resolve', {
-    preHandler: [authenticate, isAdmin],
+  fastify.put('/tickets/:id', {
+    preHandler: [authenticate],
     schema: {
-      description: 'Resolve um chamado e devolve o equipamento para Disponível.',
+      description: 'Permite ao funcionário comum editar o relato do problema antes do atendimento da TI.',
       tags: ['Chamados'],
       params: {
         type: 'object',
@@ -224,11 +246,34 @@ const routes = async (fastify, options) => {
       },
       body: {
         type: 'object',
-        required: ['resolucao_ti'],
-        properties: { resolucao_ti: { type: 'string' } }
+        required: ['descricao_problema'],
+        properties: {
+          descricao_problema: { type: 'string' }
+        }
       }
     }
-  }, ticketController.resolve);
+  }, ticketController.update);
+
+  fastify.patch('/tickets/:id/status', {
+    preHandler: [authenticate, isAdmin],
+    schema: {
+      description: 'Altera o status do chamado e reflete no equipamento físico.',
+      tags: ['Chamados'],
+      params: {
+        type: 'object',
+        required: ['id'],
+        properties: { id: { type: 'integer' } }
+      },
+      body: {
+        type: 'object',
+        required: ['status_chamado'],
+        properties: {
+          status_chamado: { type: 'string', enum: ['Aberto', 'Concluído', 'Baixa'] },
+          resolucao_ti: { type: 'string', nullable: true }
+        }
+      }
+    }
+  }, ticketController.updateStatus);
 
 };
 
