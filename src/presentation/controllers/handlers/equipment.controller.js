@@ -1,8 +1,10 @@
 const equipmentService = require('../../../application/services/equipment.service');
+const sseService = require('../../../application/services/sse.service');
 
 exports.create = async (req, res) => {
   try {
     const equipment = await equipmentService.createEquipment(req.body);
+    sseService.broadcast({ action: 'RELOAD_DATA' });
     return res.status(201).send(equipment);
   } catch (e) { res.status(400).send({ error: e.message }); }
 };
@@ -17,6 +19,7 @@ exports.update = async (req, res) => {
     const { id } = req.params;
     const { Equipment } = require('../../../infra/db/sequelize/models');
     await Equipment.update(req.body, { where: { id } });
+    sseService.broadcast({ action: 'RELOAD_DATA' });
     return res.send({ message: 'Equipamento atualizado com sucesso.' });
   } catch (e) { res.status(400).send({ error: e.message }); }
 };
@@ -26,6 +29,7 @@ exports.delete = async (req, res) => {
     const { id } = req.params;
     const { Equipment } = require('../../../infra/db/sequelize/models');
     await Equipment.destroy({ where: { id } });
+    sseService.broadcast({ action: 'RELOAD_DATA' });
     return res.send({ message: 'Equipamento deletado.' });
   } catch (e) { res.status(400).send({ error: 'Não é possível deletar equipamento com histórico de chamados.' }); }
 };

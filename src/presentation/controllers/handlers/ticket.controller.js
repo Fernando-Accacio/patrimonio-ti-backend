@@ -1,9 +1,11 @@
 const ticketService = require('../../../application/services/ticket.service');
+const sseService = require('../../../application/services/sse.service');
 
 exports.open = async (req, res) => {
   try {
     const data = { ...req.body, user_id: req.user.id };
     const ticket = await ticketService.openTicket(data);
+    sseService.broadcast({ action: 'RELOAD_DATA' });
     return res.status(201).send(ticket);
   } catch (e) { res.status(400).send({ error: e.message }); }
 };
@@ -28,6 +30,7 @@ exports.update = async (req, res) => {
     const { descricao_problema } = req.body;
     
     const ticketAtualizado = await ticketService.updateTicketDescription(id, descricao_problema);
+    sseService.broadcast({ action: 'RELOAD_DATA' });
     return res.send(ticketAtualizado);
   } catch (e) { 
     res.status(400).send({ error: e.message }); 
@@ -52,6 +55,7 @@ exports.updateStatus = async (req, res) => {
     const { status_chamado, resolucao_ti } = req.body;
     
     const ticket = await ticketService.updateTicketStatus(id, status_chamado, resolucao_ti);
+    sseService.broadcast({ action: 'RELOAD_DATA' });
     return res.send(ticket);
   } catch (e) { 
     res.status(400).send({ error: e.message }); 

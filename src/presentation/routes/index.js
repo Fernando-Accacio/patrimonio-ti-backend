@@ -2,6 +2,7 @@ const userController = require('../controllers/handlers/user.controller');
 const equipmentController = require('../controllers/handlers/equipment.controller');
 const ticketController = require('../controllers/handlers/ticket.controller');
 const { authenticate, isAdmin } = require('../../core/middleware/auth.middleware');
+const sseService = require('../../application/services/sse.service');
 
 const routes = async (fastify, options) => {
 
@@ -274,6 +275,25 @@ const routes = async (fastify, options) => {
       }
     }
   }, ticketController.updateStatus);
+
+  fastify.get('/stream', {
+    schema: {
+      description: 'Rota SSE para atualizações em tempo real (Não aparece no Swagger por manter a conexão aberta).',
+      tags: ['Realtime'],
+    }
+  }, (request, reply) => {
+    reply.raw.setHeader('Content-Type', 'text/event-stream');
+    reply.raw.setHeader('Cache-Control', 'no-cache');
+    reply.raw.setHeader('Connection', 'keep-alive');
+    reply.raw.setHeader('Access-Control-Allow-Origin', '*');
+    reply.raw.flushHeaders();
+
+    sseService.addClient(reply.raw);
+
+    request.raw.on('close', () => {
+      sseService.removeClient(reply.raw);
+    });
+  });
 
 };
 
