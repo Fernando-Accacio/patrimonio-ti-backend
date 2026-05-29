@@ -6,7 +6,7 @@ exports.create = async (req, res) => {
     const equipment = await equipmentService.createEquipment(req.body);
     sseService.broadcast({ action: 'RELOAD_DATA' });
     return res.status(201).send(equipment);
-  } catch (e) { res.status(400).send({ error: e.message }); }
+  } catch (e) { console.log(e); res.status(400).send({ error: e.message }); }
 };
 
 exports.list = async (req, res) => {

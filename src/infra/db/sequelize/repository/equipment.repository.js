@@ -1,4 +1,4 @@
-const { Equipment } = require('../models');
+const { Equipment } = require("../models");
 
 class EquipmentRepository {
   async create(equipmentData) {
@@ -16,6 +16,11 @@ class EquipmentRepository {
   async update(id, updateData) {
     await Equipment.update(updateData, { where: { id } });
     return await Equipment.findByPk(id);
+  }
+
+  async delete(id) {
+    // return await Equipment.destroy({ where: {  } });
+    return
   }
 }
 

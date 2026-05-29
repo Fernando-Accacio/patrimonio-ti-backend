@@ -12,11 +12,19 @@ class EquipmentService {
   }
 
   async getAllEquipments() {
+    // return await equipmentRepository.findAll(recebe query para filtro e limite e paginação);
     return await equipmentRepository.findAll();
   }
 
   async updateEquipmentStatus(id, newStatus) {
     // Ex: Atualiza de 'Em Uso' para 'Manutenção'
+
+    // verifica se existe antes -> cria o find by pk
+    // const equipment = await equipmentRepository.findByPk(id);
+    // if (!equipment) {
+    //   throw new Error('Equipamento não encontrado.');
+    // }
+
     return await equipmentRepository.update(id, { status: newStatus });
   }
 }
