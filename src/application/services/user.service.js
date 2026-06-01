@@ -5,44 +5,53 @@ const env = require('../../core/env');
 
 class UserService {
   async createUser(data) {
-    // 1. Verifica se o e-mail já existe
     const userExists = await userRepository.findByEmail(data.email);
-    if (userExists) {
-      throw new Error('E-mail já cadastrado.');
-    }
+    if (userExists) throw new Error('E-mail já cadastrado.');
 
-    // 2. Criptografa a senha antes de salvar
     const hashedPassword = await bcrypt.hash(data.senha, 10);
     data.senha = hashedPassword;
 
-    // 3. Salva no banco
     return await userRepository.create(data);
   }
 
   async login(email, senha) {
-    // 1. Busca o usuário
     const user = await userRepository.findByEmail(email);
-    if (!user) {
-      throw new Error('Usuário não encontrado.');
-    }
+    if (!user) throw new Error('Usuário não encontrado.');
 
-    // 2. Compara a senha digitada com a criptografada no banco
     const isPasswordValid = await bcrypt.compare(senha, user.senha);
-    if (!isPasswordValid) {
-      throw new Error('Senha incorreta.');
-    }
+    if (!isPasswordValid) throw new Error('Senha incorreta.');
 
-    // 3. Gera o Token JWT contendo o ID e a Role (ADMIN/USER)
     const token = jwt.sign(
       { id: user.id, role: user.role },
       env.app.jwtSecret,
-      { expiresIn: '8h' } // Token expira em 8 horas (um turno de trabalho)
+      { expiresIn: '8h' } 
     );
 
     return { 
       token, 
       user: { id: user.id, nome: user.nome, email: user.email, role: user.role } 
     };
+  }
+
+  // Atualizar Nome e E-mail
+  async updateProfile(id, data) {
+    // Se ele está tentando mudar o email, precisamos checar se já não existe outro com esse email
+    if (data.email) {
+      const emailExists = await userRepository.findByEmail(data.email);
+      if (emailExists && emailExists.id !== parseInt(id)) {
+        throw new Error('Este e-mail já está em uso por outro usuário.');
+      }
+    }
+    return await userRepository.update(id, { nome: data.nome, email: data.email });
+  }
+
+  //Atualizar Senha (com criptografia)
+  async updatePassword(id, novaSenha) {
+    if (!novaSenha || novaSenha.length < 6) {
+      throw new Error('A nova senha deve ter pelo menos 6 caracteres.');
+    }
+    const hashedPassword = await bcrypt.hash(novaSenha, 10);
+    return await userRepository.update(id, { senha: hashedPassword });
   }
 }
 

@@ -1,5 +1,6 @@
 const ticketRepository = require('../../infra/db/sequelize/repository/ticket.repository');
 const equipmentRepository = require('../../infra/db/sequelize/repository/equipment.repository');
+const sseService = require('./sse.service');
 
 class TicketService {
   async openTicket(data) {
@@ -10,7 +11,8 @@ class TicketService {
         patrimonio: data.patrimonio,
         tipo: data.tipo,              
         status: 'Em Manutenção',
-        observacao: data.localizacao  
+        observacao: data.localizacao,
+        criado_por: 'Usuário (Via Chamado)'
       });
     } else {
       await equipmentRepository.update(equipment.id, { status: 'Em Manutenção' });
@@ -23,22 +25,57 @@ class TicketService {
       status_chamado: 'Aberto'
     };
 
-    return await ticketRepository.create(ticketData);
+    const newTicket = await ticketRepository.create(ticketData);
+    
+    sseService.broadcast({ action: 'RELOAD_DATA' }); 
+    return newTicket;
   }
 
   async getAllTickets() {
     return await ticketRepository.findAll();
   }
 
-  async updateTicketDescription(id, descricao_problema) {
+// NOVA FUNÇÃO: Permite editar o chamado por completo com lógica inteligente de patrimônio
+  async updateTicketInfo(id, data) {
     const ticket = await ticketRepository.findById(id);
     if (!ticket) throw new Error('Chamado não encontrado.');
 
-    if (ticket.status_chamado === 'Concluído') {
-      throw new Error('Operação negada: Chamados concluídos não podem ser editados.');
+    if (ticket.status_chamado === 'Concluído' || ticket.status_chamado === 'Baixa') {
+      throw new Error('Operação negada: Chamados finalizados não podem ser editados.');
     }
 
-    return await ticketRepository.update(id, { descricao_problema });
+    let equipment_id = ticket.equipment_id;
+
+    if (data.patrimonio) {
+      let equipmentDestino = await equipmentRepository.findByPatrimonio(data.patrimonio);
+
+      if (!equipmentDestino) {
+        // Cenário 1: O patrimônio não existe. Foi um erro de digitação!
+        // Atualiza a máquina atual em vez de criar uma nova.
+        await equipmentRepository.update(equipment_id, {
+          patrimonio: data.patrimonio,
+          tipo: data.tipo,
+          observacao: data.localizacao,
+          criado_por: 'Usuário (Via Chamado)'
+        });
+      } else {
+        // Cenário 2: O usuário alterou para uma máquina que já existe no banco.
+        // Vincula o chamado a ela e atualiza suas informações.
+        await equipmentRepository.update(equipmentDestino.id, {
+          tipo: data.tipo || equipmentDestino.tipo,
+          observacao: data.localizacao || equipmentDestino.observacao
+        });
+        equipment_id = equipmentDestino.id;
+      }
+    }
+
+    const updated = await ticketRepository.update(id, { 
+      descricao_problema: data.descricao_problema,
+      equipment_id: equipment_id 
+    });
+    
+    sseService.broadcast({ action: 'RELOAD_DATA' });
+    return updated;
   }
 
   async updateTicketStatus(id, status_chamado, resolucao_ti) {
@@ -59,7 +96,8 @@ class TicketService {
     }
 
     await equipmentRepository.update(ticket.equipment_id, { status: equipamentoStatus });
-
+    
+    sseService.broadcast({ action: 'RELOAD_DATA' }); // <-- Atualiza a tela
     return updatedTicket;
   }
 }

@@ -2,7 +2,14 @@ const { Equipment } = require("../models");
 
 class EquipmentRepository {
   async create(equipmentData) {
-    return await Equipment.create(equipmentData);
+    // Ajustado: Mapeamento explícito para o ORM salvar a nova coluna no banco de dados
+    return await Equipment.create({
+      patrimonio: equipmentData.patrimonio,
+      tipo: equipmentData.tipo,
+      status: equipmentData.status,
+      observacao: equipmentData.observacao,
+      criado_por: equipmentData.criado_por 
+    });
   }
 
   async findAll() {
@@ -19,8 +26,7 @@ class EquipmentRepository {
   }
 
   async delete(id) {
-    // return await Equipment.destroy({ where: {  } });
-    return
+    return await Equipment.destroy({ where: { id } });
   }
 }
 

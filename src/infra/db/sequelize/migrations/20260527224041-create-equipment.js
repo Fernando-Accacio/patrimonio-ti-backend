@@ -26,6 +26,10 @@ module.exports = {
       observacao: {
         type: Sequelize.STRING
       },
+      criado_por: {
+        type: Sequelize.STRING,
+        allowNull: true
+      },
       createdAt: {
         allowNull: false,
         type: Sequelize.DATE

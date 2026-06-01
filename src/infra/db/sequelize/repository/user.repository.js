@@ -14,6 +14,19 @@ class UserRepository {
       attributes: { exclude: ['senha'] } 
     });
   }
+
+  // NOVAS FUNÇÕES ADICIONADAS
+  async findAll() {
+    return await User.findAll({ attributes: { exclude: ['senha'] } });
+  }
+
+  async update(id, updateData) {
+    return await User.update(updateData, { where: { id } });
+  }
+
+  async delete(id) {
+    return await User.destroy({ where: { id } });
+  }
 }
 
 module.exports = new UserRepository();

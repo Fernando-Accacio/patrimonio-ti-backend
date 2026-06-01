@@ -3,7 +3,7 @@ const cors = require('@fastify/cors');
 const fastifySwagger = require('@fastify/swagger');
 const fastifySwaggerUI = require('@fastify/swagger-ui');
 const env = require('./core/env');
-const routes = require('./presentation/routes');
+const routes = require('./presentation/routes/routes.js');
 
 const fastify = Fastify({
   logger: {

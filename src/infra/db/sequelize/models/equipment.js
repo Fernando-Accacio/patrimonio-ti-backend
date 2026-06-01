@@ -11,7 +11,8 @@ module.exports = (sequelize, DataTypes) => {
     patrimonio: DataTypes.STRING,
     tipo: DataTypes.STRING,
     status: DataTypes.STRING,
-    observacao: DataTypes.STRING
+    observacao: DataTypes.STRING,
+    criado_por: DataTypes.STRING
   }, {
     sequelize,
     modelName: 'Equipment',

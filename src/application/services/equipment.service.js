@@ -1,31 +1,40 @@
 const equipmentRepository = require('../../infra/db/sequelize/repository/equipment.repository');
+const sseService = require('./sse.service');
 
 class EquipmentService {
   async createEquipment(data) {
-    // Verifica se o patrimônio já foi cadastrado
     const exists = await equipmentRepository.findByPatrimonio(data.patrimonio);
     if (exists) {
       throw new Error('Este número de patrimônio já está cadastrado no sistema.');
     }
     
-    return await equipmentRepository.create(data);
+    // Ajustado: Passa os dados estruturados garantindo o recebimento do criado_por
+    const newEq = await equipmentRepository.create({
+      patrimonio: data.patrimonio,
+      tipo: data.tipo,
+      observacao: data.observacao,
+      status: data.status || 'Disponível',
+      criado_por: data.criado_por // Carimbo vindo do controller ('Admin (Manual)')
+    });
+    
+    sseService.broadcast({ action: 'RELOAD_DATA' }); // Atualiza a tela
+    return newEq;
   }
 
   async getAllEquipments() {
-    // return await equipmentRepository.findAll(recebe query para filtro e limite e paginação);
     return await equipmentRepository.findAll();
   }
 
   async updateEquipmentStatus(id, newStatus) {
-    // Ex: Atualiza de 'Em Uso' para 'Manutenção'
+    const updated = await equipmentRepository.update(id, { status: newStatus });
+    sseService.broadcast({ action: 'RELOAD_DATA' });
+    return updated;
+  }
 
-    // verifica se existe antes -> cria o find by pk
-    // const equipment = await equipmentRepository.findByPk(id);
-    // if (!equipment) {
-    //   throw new Error('Equipamento não encontrado.');
-    // }
-
-    return await equipmentRepository.update(id, { status: newStatus });
+  async deleteEquipment(id) {
+    const deleted = await equipmentRepository.delete(id);
+    sseService.broadcast({ action: 'RELOAD_DATA' }); // Atualiza a tela e some
+    return deleted;
   }
 }
 
