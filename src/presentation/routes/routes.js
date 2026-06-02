@@ -6,6 +6,10 @@ const sseService = require('../../application/services/sse.service');
 
 const routes = async (fastify, options) => {
 
+  // ==========================================
+  // SCHEMAS BASE E REUTILIZÁVEIS
+  // ==========================================
+  
   const errorResponse = {
     type: 'object',
     properties: { error: { type: 'string' } }
@@ -55,7 +59,7 @@ const routes = async (fastify, options) => {
       tags: ['Autenticação'],
       body: {
         type: 'object',
-        required: ['nome', 'email', 'role'], // Senha não é mais obrigatória aqui
+        required: ['nome', 'email', 'role'],
         properties: {
           nome: { type: 'string' },
           email: { type: 'string', format: 'email' },
@@ -63,7 +67,7 @@ const routes = async (fastify, options) => {
         }
       },
       response: {
-        201: { type: 'object', properties: { id: { type: 'integer' }, email: { type: 'string' } } },
+        201: { type: 'object', properties: { id: { type: 'integer' } } },
         400: errorResponse
       }
     }
@@ -126,7 +130,7 @@ const routes = async (fastify, options) => {
   fastify.get('/users', {
     preHandler: [authenticate, isAdmin],
     schema: {
-      description: 'Lista todos os funcionários/usuários cadastrados.',
+      description: 'Lista todos os funcionários/usuários cadastrados com e-mails ofuscados.',
       tags: ['Usuários'],
       response: {
         200: {
@@ -197,8 +201,100 @@ const routes = async (fastify, options) => {
   }, userController.delete.bind(userController));
 
   // ==========================================
+  // ROTAS DE RECUPERAÇÃO DE SENHA (ESQUECI A SENHA)
+  // ==========================================
+
+  fastify.post('/password-resets/request', {
+    schema: {
+      description: 'Cria uma solicitação de redefinição de senha pendente para aprovação do TI.',
+      tags: ['Autenticação'],
+      body: {
+        type: 'object',
+        required: ['email'],
+        properties: {
+          email: { type: 'string', format: 'email' }
+        }
+      },
+      response: {
+        200: successMessage,
+        400: errorResponse
+      }
+    }
+  }, userController.requestReset.bind(userController));
+
+  fastify.get('/password-resets', {
+    preHandler: [authenticate, isAdmin],
+    schema: {
+      description: 'Lista todas as solicitações de senha atualmente pendentes de análise.',
+      tags: ['Usuários'],
+      response: {
+        200: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              id: { type: 'integer' },
+              userId: { type: 'integer' },
+              nome: { type: 'string' },
+              email: { type: 'string' },
+              dataSolicitacao: { type: 'string' }
+            }
+          }
+        },
+        401: errorResponse,
+        403: errorResponse,
+        500: errorResponse
+      }
+    }
+  }, userController.getResetRequests.bind(userController));
+
+  fastify.get('/password-resets/history', { 
+    preHandler: [authenticate, isAdmin], 
+    schema: { tags: ['Usuários'] } }, 
+    userController.getResetHistory.bind(userController));
+
+  fastify.post('/password-resets/:id/approve', {
+    preHandler: [authenticate, isAdmin],
+    schema: {
+      description: 'Aprova o pedido, gera uma nova senha forte aleatória e remove o pedido da lista.',
+      tags: ['Usuários'],
+      params: {
+        type: 'object',
+        required: ['id'],
+        properties: { id: { type: 'integer' } }
+      },
+      response: {
+        200: successMessage,
+        400: errorResponse,
+        401: errorResponse,
+        403: errorResponse
+      }
+    }
+  }, userController.approveReset.bind(userController));
+
+  fastify.post('/password-resets/:id/reject', {
+    preHandler: [authenticate, isAdmin],
+    schema: {
+      description: 'Recusa a solicitação de redefinição de senha e a remove da lista.',
+      tags: ['Usuários'],
+      params: {
+        type: 'object',
+        required: ['id'],
+        properties: { id: { type: 'integer' } }
+      },
+      response: {
+        200: successMessage,
+        400: errorResponse,
+        401: errorResponse,
+        403: errorResponse
+      }
+    }
+  }, userController.rejectReset.bind(userController));
+
+  // ==========================================
   // ROTAS DE EQUIPAMENTOS
   // ==========================================
+  
   fastify.get('/equipments', {
     preHandler: [authenticate],
     schema: {
@@ -284,6 +380,7 @@ const routes = async (fastify, options) => {
   // ==========================================
   // ROTAS DE CHAMADOS (TICKETS)
   // ==========================================
+  
   fastify.get('/tickets', {
     preHandler: [authenticate],
     schema: {
@@ -391,6 +488,7 @@ const routes = async (fastify, options) => {
   // ==========================================
   // ROTA SSE (REALTIME)
   // ==========================================
+  
   fastify.get('/stream', {
     schema: {
       description: 'Rota SSE para atualizações em tempo real.',

@@ -15,9 +15,13 @@ class UserRepository {
     });
   }
 
-  // NOVAS FUNÇÕES ADICIONADAS
   async findAll() {
     return await User.findAll({ attributes: { exclude: ['senha'] } });
+  }
+
+  // NOVO MÉTODO: Ignora o bloqueio e traz a senha para validação do Bcrypt no login
+  async findAllWithPassword() {
+    return await User.findAll(); // Traz todos os campos sem exclusão
   }
 
   async update(id, updateData) {
