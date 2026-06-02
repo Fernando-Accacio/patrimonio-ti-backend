@@ -6,10 +6,6 @@ const sseService = require('../../application/services/sse.service');
 
 const routes = async (fastify, options) => {
 
-  // ==========================================
-  // SCHEMAS BASE E REUTILIZÁVEIS
-  // ==========================================
-  
   const errorResponse = {
     type: 'object',
     properties: { error: { type: 'string' } }
@@ -25,11 +21,11 @@ const routes = async (fastify, options) => {
     type: 'object',
     properties: {
       id: { type: 'integer' },
-      patrimonio: { type: 'string', maxLength: 7 }, // CORREÇÃO: Aceita 7 caracteres
+      patrimonio: { type: 'string', maxLength: 7 },
       tipo: { type: 'string' },
       status: { type: 'string' },
       observacao: { type: 'string', nullable: true },
-      criado_por: { type: 'string', nullable: true }, // CORREÇÃO: Liberado no filtro do Fastify
+      criado_por: { type: 'string', nullable: true },
       createdAt: { type: 'string' },
       updatedAt: { type: 'string' }
     }
@@ -55,15 +51,14 @@ const routes = async (fastify, options) => {
 
   fastify.post('/register', {
     schema: {
-      description: 'Cadastra um novo usuário no sistema (Use para criar o Admin inicial).',
+      description: 'Cadastra um novo usuário no sistema com senha automática.',
       tags: ['Autenticação'],
       body: {
         type: 'object',
-        required: ['nome', 'email', 'senha', 'role'],
+        required: ['nome', 'email', 'role'], // Senha não é mais obrigatória aqui
         properties: {
           nome: { type: 'string' },
           email: { type: 'string', format: 'email' },
-          senha: { type: 'string' },
           role: { type: 'string', enum: ['ADMIN', 'USER'] }
         }
       },
@@ -107,27 +102,6 @@ const routes = async (fastify, options) => {
     }
   }, userController.login.bind(userController));
 
-  fastify.put('/users/me/profile', {
-    preHandler: [authenticate],
-    schema: {
-      description: 'Permite ao usuário comum alterar seu próprio nome e e-mail.',
-      tags: ['Perfil'],
-      body: {
-        type: 'object',
-        required: ['nome', 'email'],
-        properties: {
-          nome: { type: 'string' },
-          email: { type: 'string', format: 'email' }
-        }
-      },
-      response: {
-        200: successMessage,
-        400: errorResponse,
-        401: errorResponse
-      }
-    }
-  }, userController.updateProfile.bind(userController));
-
   fastify.patch('/users/me/password', {
     preHandler: [authenticate],
     schema: {
@@ -148,32 +122,6 @@ const routes = async (fastify, options) => {
       }
     }
   }, userController.updatePassword.bind(userController));
-
-  fastify.patch('/users/:id/password', {
-    preHandler: [authenticate, isAdmin],
-    schema: {
-      description: 'Permite ao ADMIN alterar a senha de qualquer usuário.',
-      tags: ['Usuários'],
-      params: {
-        type: 'object',
-        required: ['id'],
-        properties: { id: { type: 'integer' } }
-      },
-      body: {
-        type: 'object',
-        required: ['novaSenha'],
-        properties: {
-          novaSenha: { type: 'string' }
-        }
-      },
-      response: {
-        200: successMessage,
-        400: errorResponse,
-        401: errorResponse,
-        403: errorResponse
-      }
-    }
-  }, userController.updateAnyUserPassword.bind(userController));
 
   fastify.get('/users', {
     preHandler: [authenticate, isAdmin],
@@ -273,7 +221,7 @@ const routes = async (fastify, options) => {
         type: 'object',
         required: ['patrimonio', 'tipo'],
         properties: {
-          patrimonio: { type: 'string', maxLength: 7 }, // CORREÇÃO: Limite atualizado para 7
+          patrimonio: { type: 'string', maxLength: 7 },
           tipo: { type: 'string' },
           observacao: { type: 'string' }
         }
@@ -371,7 +319,7 @@ const routes = async (fastify, options) => {
         type: 'object',
         required: ['patrimonio', 'descricao_problema', 'tipo', 'localizacao'],
         properties: {
-          patrimonio: { type: 'string', maxLength: 7 }, // CORREÇÃO: Limite de 7
+          patrimonio: { type: 'string', maxLength: 7 },
           descricao_problema: { type: 'string' },
           tipo: { type: 'string' },        
           localizacao: { type: 'string' }   
@@ -400,7 +348,7 @@ const routes = async (fastify, options) => {
         required: ['descricao_problema', 'patrimonio', 'tipo', 'localizacao'],
         properties: {
           descricao_problema: { type: 'string' },
-          patrimonio: { type: 'string', maxLength: 7 }, // CORREÇÃO: Limite de 7
+          patrimonio: { type: 'string', maxLength: 7 },
           tipo: { type: 'string' },        
           localizacao: { type: 'string' } 
         }

@@ -1,6 +1,6 @@
 const userService = require('../../../application/services/user.service');
 const userRepository = require('../../../infra/db/sequelize/repository/user.repository');
-const sseService = require('../../../application/services/sse.service'); // <-- IMPORTADO O SSE AQUI!
+const sseService = require('../../../application/services/sse.service'); 
 
 class UserController {
   async register(req, res) {
@@ -42,7 +42,6 @@ class UserController {
 
       await userRepository.update(id, { role });
       
-      // <-- O GRITO NO MEGAFONE: Desloga o usuário que teve a role alterada e atualiza a tabela
       sseService.broadcast({ action: 'FORCE_LOGOUT', userId: parseInt(id) });
       sseService.broadcast({ action: 'RELOAD_DATA' });
 
@@ -63,7 +62,6 @@ class UserController {
       const deletados = await userRepository.delete(id);
       if (deletados === 0) return res.status(404).send({ error: 'Usuário não encontrado.' });
 
-      // <-- O GRITO NO MEGAFONE: Derruba a sessão da pessoa deletada e atualiza a tabela
       sseService.broadcast({ action: 'FORCE_LOGOUT', userId: parseInt(id) });
       sseService.broadcast({ action: 'RELOAD_DATA' });
 
@@ -73,44 +71,17 @@ class UserController {
     }
   }
 
-  // --- NOVAS ROTAS DE PERFIL ---
-
-  async updateProfile(req, res) {
-    try {
-      const { nome, email } = req.body;
-      await userService.updateProfile(req.user.id, { nome, email });
-      return res.status(200).send({ message: 'Perfil atualizado com sucesso.' });
-    } catch (e) {
-      return res.status(400).send({ error: e.message });
-    }
-  }
-
   async updatePassword(req, res) {
     try {
       const { novaSenha } = req.body;
       await userService.updatePassword(req.user.id, novaSenha);
-      return res.status(200).send({ message: 'Senha atualizada com sucesso.' });
+      return res.status(200).send({ message: 'Senha updated!' });
     } catch (e) {
       return res.status(400).send({ error: e.message });
     }
   }
-
-  async updateAnyUserPassword(req, res) {
-    try {
-      const { id } = req.params; // ID do usuário que vai ter a senha trocada
-      const { novaSenha } = req.body;
-      
-      // Reutiliza a lógica segura do service
-      await userService.updatePassword(id, novaSenha);
-      
-      // <-- O GRITO NO MEGAFONE: Se o Admin resetar a senha de um funcionário, derruba a sessão dele!
-      sseService.broadcast({ action: 'FORCE_LOGOUT', userId: parseInt(id) });
-
-      return res.status(200).send({ message: 'Senha do usuário atualizada com sucesso.' });
-    } catch (e) {
-      return res.status(400).send({ error: e.message });
-    }
-  }
+  
+  // O MÉTODO "updateAnyUserPassword" FOI DELETADO DAQUI!
 }
 
 module.exports = new UserController();
