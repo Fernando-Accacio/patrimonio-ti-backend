@@ -25,11 +25,11 @@ const routes = async (fastify, options) => {
     type: 'object',
     properties: {
       id: { type: 'integer' },
-      patrimonio: { type: 'string', maxLength: 7 }, // CORREÇÃO: Limite de 7 dígitos no banco
+      patrimonio: { type: 'string', maxLength: 7 }, // CORREÇÃO: Aceita 7 caracteres
       tipo: { type: 'string' },
       status: { type: 'string' },
       observacao: { type: 'string', nullable: true },
-      criado_por: { type: 'string', nullable: true }, // CORREÇÃO: Fastify agora permite enviar este campo!
+      criado_por: { type: 'string', nullable: true }, // CORREÇÃO: Liberado no filtro do Fastify
       createdAt: { type: 'string' },
       updatedAt: { type: 'string' }
     }
@@ -273,7 +273,7 @@ const routes = async (fastify, options) => {
         type: 'object',
         required: ['patrimonio', 'tipo'],
         properties: {
-          patrimonio: { type: 'string', maxLength: 7 }, // CORREÇÃO: Aceita 7 dígitos no POST
+          patrimonio: { type: 'string', maxLength: 7 }, // CORREÇÃO: Limite atualizado para 7
           tipo: { type: 'string' },
           observacao: { type: 'string' }
         }
@@ -371,7 +371,7 @@ const routes = async (fastify, options) => {
         type: 'object',
         required: ['patrimonio', 'descricao_problema', 'tipo', 'localizacao'],
         properties: {
-          patrimonio: { type: 'string', maxLength: 7 }, // CORREÇÃO: Permite 7 dígitos na abertura
+          patrimonio: { type: 'string', maxLength: 7 }, // CORREÇÃO: Limite de 7
           descricao_problema: { type: 'string' },
           tipo: { type: 'string' },        
           localizacao: { type: 'string' }   
@@ -400,7 +400,7 @@ const routes = async (fastify, options) => {
         required: ['descricao_problema', 'patrimonio', 'tipo', 'localizacao'],
         properties: {
           descricao_problema: { type: 'string' },
-          patrimonio: { type: 'string', maxLength: 7 }, // CORREÇÃO: Permite 7 dígitos na edição
+          patrimonio: { type: 'string', maxLength: 7 }, // CORREÇÃO: Limite de 7
           tipo: { type: 'string' },        
           localizacao: { type: 'string' } 
         }

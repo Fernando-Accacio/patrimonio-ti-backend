@@ -1,5 +1,6 @@
 const userService = require('../../../application/services/user.service');
 const userRepository = require('../../../infra/db/sequelize/repository/user.repository');
+const sseService = require('../../../application/services/sse.service'); // <-- IMPORTADO O SSE AQUI!
 
 class UserController {
   async register(req, res) {
@@ -40,6 +41,11 @@ class UserController {
       }
 
       await userRepository.update(id, { role });
+      
+      // <-- O GRITO NO MEGAFONE: Desloga o usuário que teve a role alterada e atualiza a tabela
+      sseService.broadcast({ action: 'FORCE_LOGOUT', userId: parseInt(id) });
+      sseService.broadcast({ action: 'RELOAD_DATA' });
+
       return res.status(200).send({ message: 'Nível de acesso atualizado.' });
     } catch (e) {
       return res.status(500).send({ error: e.message });
@@ -56,6 +62,10 @@ class UserController {
 
       const deletados = await userRepository.delete(id);
       if (deletados === 0) return res.status(404).send({ error: 'Usuário não encontrado.' });
+
+      // <-- O GRITO NO MEGAFONE: Derruba a sessão da pessoa deletada e atualiza a tabela
+      sseService.broadcast({ action: 'FORCE_LOGOUT', userId: parseInt(id) });
+      sseService.broadcast({ action: 'RELOAD_DATA' });
 
       return res.status(200).send({ message: 'Usuário inativado com sucesso.' });
     } catch (e) { 
@@ -93,6 +103,9 @@ class UserController {
       // Reutiliza a lógica segura do service
       await userService.updatePassword(id, novaSenha);
       
+      // <-- O GRITO NO MEGAFONE: Se o Admin resetar a senha de um funcionário, derruba a sessão dele!
+      sseService.broadcast({ action: 'FORCE_LOGOUT', userId: parseInt(id) });
+
       return res.status(200).send({ message: 'Senha do usuário atualizada com sucesso.' });
     } catch (e) {
       return res.status(400).send({ error: e.message });

@@ -3,15 +3,38 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const env = require('../../core/env');
 
+// Função auxiliar para gerar senha automática
+const gerarSenhaAutomatica = () => {
+  const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%&*";
+  const length = Math.floor(Math.random() * (12 - 8 + 1)) + 8; // Entre 8 e 12
+  let senha = "";
+  for (let i = 0; i < length; i++) {
+    senha += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return senha;
+};
+
 class UserService {
   async createUser(data) {
     const userExists = await userRepository.findByEmail(data.email);
     if (userExists) throw new Error('E-mail já cadastrado.');
 
-    const hashedPassword = await bcrypt.hash(data.senha, 10);
+    // 1. Gera senha automática forte
+    const senhaGerada = gerarSenhaAutomatica();
+
+    // 2. Criptografa a senha gerada
+    const hashedPassword = await bcrypt.hash(senhaGerada, 10);
     data.senha = hashedPassword;
 
-    return await userRepository.create(data);
+    const novoUser = await userRepository.create(data);
+
+    // TODO: NO FUTURO, INSERIR CHAMADA AO NODEMAILER AQUI
+    // await emailService.enviarSenhaCriada(data.email, data.nome, senhaGerada);
+    
+    // (Apenas para fins de dev local, você pode imprimir a senha no console para ver funcionando)
+    console.log(`[DEV] Usuário criado! Senha automática: ${senhaGerada}`);
+
+    return novoUser;
   }
 
   async login(email, senha) {
@@ -33,19 +56,7 @@ class UserService {
     };
   }
 
-  // Atualizar Nome e E-mail
-  async updateProfile(id, data) {
-    // Se ele está tentando mudar o email, precisamos checar se já não existe outro com esse email
-    if (data.email) {
-      const emailExists = await userRepository.findByEmail(data.email);
-      if (emailExists && emailExists.id !== parseInt(id)) {
-        throw new Error('Este e-mail já está em uso por outro usuário.');
-      }
-    }
-    return await userRepository.update(id, { nome: data.nome, email: data.email });
-  }
-
-  //Atualizar Senha (com criptografia)
+  // Atualizar Senha (com criptografia)
   async updatePassword(id, novaSenha) {
     if (!novaSenha || novaSenha.length < 6) {
       throw new Error('A nova senha deve ter pelo menos 6 caracteres.');
