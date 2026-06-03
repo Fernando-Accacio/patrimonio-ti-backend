@@ -13,6 +13,11 @@ class TicketRepository {
           model: User, 
           as: 'user', 
           attributes: ['id', 'nome', 'email']
+        },
+        { 
+          model: User, 
+          as: 'tecnico', 
+          attributes: ['id', 'nome', 'email'] // NOVO: Traz os dados do técnico
         }
       ],
       order: [['createdAt', 'DESC']]
@@ -23,7 +28,8 @@ class TicketRepository {
     return await Ticket.findByPk(id, {
       include: [
         { model: Equipment, as: 'equipment' },
-        { model: User, as: 'user', attributes: ['id', 'nome', 'email'] }
+        { model: User, as: 'user', attributes: ['id', 'nome', 'email'] },
+        { model: User, as: 'tecnico', attributes: ['id', 'nome', 'email'] } // NOVO
       ]
     });
   }

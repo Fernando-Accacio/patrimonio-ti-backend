@@ -45,7 +45,18 @@ const routes = async (fastify, options) => {
       resolucao_ti: { type: 'string', nullable: true },
       data_abertura: { type: 'string' },
       equipment_id: { type: 'integer' },
-      user_id: { type: 'integer' }
+      user_id: { type: 'integer' },
+      
+      // 👇 AS DUAS PORTAS QUE FALTAVAM ABRIR:
+      tecnico_id: { type: 'integer', nullable: true },
+      tecnico: { 
+        type: 'object',
+        nullable: true,
+        properties: {
+          id: { type: 'integer' },
+          nome: { type: 'string' }
+        }
+      }
     }
   });
 
@@ -128,7 +139,7 @@ const routes = async (fastify, options) => {
   }, userController.updatePassword.bind(userController));
 
   fastify.get('/users', {
-    preHandler: [authenticate, isAdmin],
+    preHandler: [authenticate],
     schema: {
       description: 'Lista todos os funcionários/usuários cadastrados com e-mails ofuscados.',
       tags: ['Usuários'],
@@ -199,6 +210,28 @@ const routes = async (fastify, options) => {
       }
     }
   }, userController.delete.bind(userController));
+
+fastify.post('/users/admin-create', {
+    preHandler: [authenticate, isAdmin],
+    schema: {
+      description: 'Permite ao ADMIN cadastrar um novo funcionário/técnico manualmente com matrícula.',
+      tags: ['Usuários'],
+      body: {
+        type: 'object',
+        required: ['nome', 'email', 'role', 'matricula'], // Matrícula obrigatória aqui
+        properties: {
+          nome: { type: 'string' },
+          email: { type: 'string', format: 'email' },
+          matricula: { type: 'string' }, // NOVO: Campo de matrícula
+          role: { type: 'string', enum: ['ADMIN', 'USER', 'TECH'] }
+        }
+      },
+      response: {
+        201: successMessage,
+        400: errorResponse
+      }
+    }
+  }, userController.adminCreateUser.bind(userController));
 
   // ==========================================
   // ROTAS DE RECUPERAÇÃO DE SENHA (ESQUECI A SENHA)
@@ -419,7 +452,8 @@ const routes = async (fastify, options) => {
           patrimonio: { type: 'string', maxLength: 7 },
           descricao_problema: { type: 'string' },
           tipo: { type: 'string' },        
-          localizacao: { type: 'string' }   
+          localizacao: { type: 'string' },
+          tecnico_id: { type: 'integer', nullable: true } // NOVO: Libera a passagem do técnico
         }
       },
       response: {
@@ -447,7 +481,8 @@ const routes = async (fastify, options) => {
           descricao_problema: { type: 'string' },
           patrimonio: { type: 'string', maxLength: 7 },
           tipo: { type: 'string' },        
-          localizacao: { type: 'string' } 
+          localizacao: { type: 'string' },
+          tecnico_id: { type: 'integer', nullable: true } // <-- NOVO: Libera a edição do técnico!
         }
       },
       response: {
@@ -472,7 +507,7 @@ const routes = async (fastify, options) => {
         type: 'object',
         required: ['status_chamado'],
         properties: {
-          status_chamado: { type: 'string', enum: ['Aberto', 'Concluído', 'Baixa'] },
+          status_chamado: { type: 'string', enum: ['Aberto', 'Concluído', 'Baixa', 'Cancelado'] },
           resolucao_ti: { type: 'string', nullable: true }
         }
       },
@@ -484,6 +519,52 @@ const routes = async (fastify, options) => {
       }
     }
   }, ticketController.updateStatus.bind(ticketController));
+
+  fastify.patch('/tickets/:id/assign', {
+    preHandler: [authenticate], 
+    schema: {
+      description: 'Atribui um técnico de suporte a um chamado específico.',
+      tags: ['Chamados'],
+      params: {
+        type: 'object',
+        required: ['id'],
+        properties: { id: { type: 'integer' } }
+      },
+      body: {
+        type: 'object',
+        required: ['tecnico_id'],
+        properties: { tecnico_id: { type: 'integer', nullable: true } }
+      },
+      response: {
+        200: { $ref: 'Ticket#' },
+        400: errorResponse,
+        401: errorResponse,
+        403: errorResponse
+      }
+    }
+  }, ticketController.assignTechnician.bind(ticketController));
+
+  fastify.patch('/tickets/:id/cancel', {
+    preHandler: [authenticate],
+    schema: {
+      description: 'Permite ao próprio funcionário cancelar seu chamado informando um motivo.',
+      tags: ['Chamados'],
+      params: {
+        type: 'object',
+        required: ['id'],
+        properties: { id: { type: 'integer' } }
+      },
+      body: {
+        type: 'object',
+        required: ['motivo'],
+        properties: { motivo: { type: 'string' } }
+      },
+      response: {
+        200: { $ref: 'Ticket#' },
+        400: errorResponse
+      }
+    }
+  }, ticketController.cancel.bind(ticketController));
 
   // ==========================================
   // ROTA SSE (REALTIME)

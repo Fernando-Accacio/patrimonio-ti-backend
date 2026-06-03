@@ -27,8 +27,8 @@ const authenticate = async (request, reply) => {
 };
 
 const isAdmin = async (request, reply) => {
-  if (request.user.role !== 'ADMIN') {
-    reply.status(403).send({ error: 'Acesso negado. Apenas o TI pode realizar esta ação.' });
+  if (request.user.role !== 'ADMIN' && request.user.role !== 'TECH') {
+    return reply.status(403).send({ error: 'Erro: Acesso negado. Apenas a TI pode realizar esta ação.' });
   }
 };
 

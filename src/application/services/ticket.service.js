@@ -22,7 +22,8 @@ class TicketService {
       descricao_problema: data.descricao_problema,
       equipment_id: equipment.id,
       user_id: data.user_id,
-      status_chamado: 'Aberto'
+      status_chamado: 'Aberto',
+      tecnico_id: data.tecnico_id || null // <-- CORRIGIDO AQUI: Agora ele salva o técnico na criação!
     };
 
     const newTicket = await ticketRepository.create(ticketData);
@@ -69,10 +70,18 @@ class TicketService {
       }
     }
 
-    const updated = await ticketRepository.update(id, { 
+    // Prepara os dados do chamado para atualizar
+    const updatePayload = { 
       descricao_problema: data.descricao_problema,
       equipment_id: equipment_id 
-    });
+    };
+
+    // CORRIGIDO AQUI: Se o Frontend mandou a propriedade do técnico na edição, nós a incluímos no pacote!
+    if ('tecnico_id' in data) {
+      updatePayload.tecnico_id = data.tecnico_id;
+    }
+
+    const updated = await ticketRepository.update(id, updatePayload);
     
     sseService.broadcast({ action: 'RELOAD_DATA' });
     return updated;
@@ -98,6 +107,25 @@ class TicketService {
     await equipmentRepository.update(ticket.equipment_id, { status: equipamentoStatus });
     
     sseService.broadcast({ action: 'RELOAD_DATA' }); // <-- Atualiza a tela
+    return updatedTicket;
+  }
+
+  async cancelTicket(id, userId, motivo) {
+    const ticket = await ticketRepository.findById(id);
+    if (!ticket) throw new Error('Chamado não encontrado.');
+    if (ticket.user_id !== userId) throw new Error('Acesso negado: Você só pode cancelar seus próprios chamados.');
+    if (ticket.status_chamado !== 'Aberto') throw new Error('Apenas chamados que ainda estão "Abertos" podem ser cancelados.');
+
+    // Atualiza o chamado
+    const updatedTicket = await ticketRepository.update(id, {
+      status_chamado: 'Cancelado',
+      resolucao_ti: `Cancelado pelo usuário. Justificativa: ${motivo}`
+    });
+
+    // Libera o equipamento atrelado para voltar a ficar Disponível
+    await equipmentRepository.update(ticket.equipment_id, { status: 'Disponível' });
+
+    sseService.broadcast({ action: 'RELOAD_DATA' });
     return updatedTicket;
   }
 }

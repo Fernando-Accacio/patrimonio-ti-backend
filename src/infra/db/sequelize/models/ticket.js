@@ -5,6 +5,7 @@ module.exports = (sequelize, DataTypes) => {
   class Ticket extends Model {
     static associate(models) {
       Ticket.belongsTo(models.User, { foreignKey: 'user_id', as: 'user' });
+      Ticket.belongsTo(models.User, { foreignKey: 'tecnico_id', as: 'tecnico' }); // NOVO
       Ticket.belongsTo(models.Equipment, { foreignKey: 'equipment_id', as: 'equipment' });
     }
   }
@@ -14,7 +15,8 @@ module.exports = (sequelize, DataTypes) => {
     resolucao_ti: DataTypes.TEXT,
     data_abertura: DataTypes.DATE,
     equipment_id: DataTypes.INTEGER,
-    user_id: DataTypes.INTEGER
+    user_id: DataTypes.INTEGER,
+    tecnico_id: DataTypes.INTEGER // NOVO
   }, {
     sequelize,
     modelName: 'Ticket',
