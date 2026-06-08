@@ -4,578 +4,58 @@ const ticketController = require('../controllers/handlers/ticket.controller');
 const { authenticate, isAdmin } = require('../../core/middleware/auth.middleware');
 const sseService = require('../../application/services/sse.service');
 
+// IMPORTANDO OS SCHEMAS ENXUTOS 🚀
+const schemas = require('../schemas/api.schemas');
+
 const routes = async (fastify, options) => {
 
-  // ==========================================
-  // SCHEMAS BASE E REUTILIZÁVEIS
-  // ==========================================
-  
-  const errorResponse = {
-    type: 'object',
-    properties: { error: { type: 'string' } }
-  };
-
-  const successMessage = {
-    type: 'object',
-    properties: { message: { type: 'string' } }
-  };
-
-  fastify.addSchema({
-    $id: 'Equipment',
-    type: 'object',
-    properties: {
-      id: { type: 'integer' },
-      patrimonio: { type: 'string', maxLength: 7 },
-      tipo: { type: 'string' },
-      status: { type: 'string' },
-      observacao: { type: 'string', nullable: true },
-      criado_por: { type: 'string', nullable: true },
-      createdAt: { type: 'string' },
-      updatedAt: { type: 'string' }
-    }
-  });
-
-  fastify.addSchema({
-    $id: 'Ticket',
-    type: 'object',
-    properties: {
-      id: { type: 'integer' },
-      descricao_problema: { type: 'string' },
-      status_chamado: { type: 'string' },
-      resolucao_ti: { type: 'string', nullable: true },
-      data_abertura: { type: 'string' },
-      equipment_id: { type: 'integer' },
-      user_id: { type: 'integer' },
-      
-      // 👇 AS DUAS PORTAS QUE FALTAVAM ABRIR:
-      tecnico_id: { type: 'integer', nullable: true },
-      tecnico: { 
-        type: 'object',
-        nullable: true,
-        properties: {
-          id: { type: 'integer' },
-          nome: { type: 'string' }
-        }
-      }
-    }
-  });
+  // Registrar os Models globais reutilizáveis ($ref)
+  fastify.addSchema(schemas.equipmentSchema);
+  fastify.addSchema(schemas.ticketSchema);
 
   // ==========================================
   // ROTAS DE USUÁRIO / AUTH / PERFIL
   // ==========================================
-
-  fastify.post('/register', {
-    schema: {
-      description: 'Cadastra um novo usuário no sistema com senha automática.',
-      tags: ['Autenticação'],
-      body: {
-        type: 'object',
-        required: ['nome', 'email', 'role'],
-        properties: {
-          nome: { type: 'string' },
-          email: { type: 'string', format: 'email' },
-          role: { type: 'string', enum: ['ADMIN', 'USER'] }
-        }
-      },
-      response: {
-        201: { type: 'object', properties: { id: { type: 'integer' } } },
-        400: errorResponse
-      }
-    }
-  }, userController.register.bind(userController));
-
-  fastify.post('/login', {
-    schema: {
-      description: 'Faz login no sistema e retorna o Token JWT.',
-      tags: ['Autenticação'],
-      body: {
-        type: 'object',
-        required: ['email', 'senha'],
-        properties: {
-          email: { type: 'string', format: 'email' },
-          senha: { type: 'string' }
-        }
-      },
-      response: {
-        200: {
-          type: 'object',
-          properties: {
-            token: { type: 'string' },
-            user: {
-              type: 'object',
-              properties: {
-                id: { type: 'integer' },
-                nome: { type: 'string' },
-                email: { type: 'string' },
-                role: { type: 'string' }
-              }
-            }
-          }
-        },
-        401: errorResponse
-      }
-    }
-  }, userController.login.bind(userController));
-
-  fastify.patch('/users/me/password', {
-    preHandler: [authenticate],
-    schema: {
-      description: 'Permite ao usuário logado alterar sua própria senha.',
-      tags: ['Perfil'],
-      body: {
-        type: 'object',
-        required: ['novaSenha'],
-        properties: {
-          novaSenha: { type: 'string' }
-        }
-      },
-      response: {
-        200: successMessage,
-        400: errorResponse,
-        401: errorResponse,
-        403: errorResponse
-      }
-    }
-  }, userController.updatePassword.bind(userController));
-
-  fastify.get('/users', {
-    preHandler: [authenticate],
-    schema: {
-      description: 'Lista todos os funcionários/usuários cadastrados com e-mails ofuscados.',
-      tags: ['Usuários'],
-      response: {
-        200: {
-          type: 'array',
-          items: {
-            type: 'object',
-            properties: {
-              id: { type: 'integer' },
-              nome: { type: 'string' },
-              email: { type: 'string' },
-              role: { type: 'string' }
-            }
-          }
-        },
-        401: errorResponse,
-        403: errorResponse,
-        500: errorResponse
-      }
-    }
-  }, userController.listAll.bind(userController));
-
-  fastify.patch('/users/:id/role', {
-    preHandler: [authenticate, isAdmin],
-    schema: {
-      description: 'Altera o nível de acesso (Role) de um funcionário da prefeitura.',
-      tags: ['Usuários'],
-      params: {
-        type: 'object',
-        required: ['id'],
-        properties: { id: { type: 'integer' } }
-      },
-      body: {
-        type: 'object',
-        required: ['role'],
-        properties: {
-          role: { type: 'string', enum: ['ADMIN', 'USER'] }
-        }
-      },
-      response: {
-        200: successMessage,
-        400: errorResponse,
-        401: errorResponse,
-        403: errorResponse,
-        404: errorResponse,
-        500: errorResponse
-      }
-    }
-  }, userController.updateRole.bind(userController));
-
-  fastify.delete('/users/:id', {
-    preHandler: [authenticate, isAdmin],
-    schema: {
-      description: 'Remove um usuário do sistema (Soft Delete). O histórico de chamados dele é mantido.',
-      tags: ['Usuários'],
-      params: {
-        type: 'object',
-        required: ['id'],
-        properties: { id: { type: 'integer' } }
-      },
-      response: {
-        200: successMessage,
-        401: errorResponse,
-        403: errorResponse,
-        404: errorResponse,
-        500: errorResponse
-      }
-    }
-  }, userController.delete.bind(userController));
-
-fastify.post('/users/admin-create', {
-    preHandler: [authenticate, isAdmin],
-    schema: {
-      description: 'Permite ao ADMIN cadastrar um novo funcionário/técnico manualmente com matrícula.',
-      tags: ['Usuários'],
-      body: {
-        type: 'object',
-        required: ['nome', 'email', 'role', 'matricula'], // Matrícula obrigatória aqui
-        properties: {
-          nome: { type: 'string' },
-          email: { type: 'string', format: 'email' },
-          matricula: { type: 'string' }, // NOVO: Campo de matrícula
-          role: { type: 'string', enum: ['ADMIN', 'USER', 'TECH'] }
-        }
-      },
-      response: {
-        201: successMessage,
-        400: errorResponse
-      }
-    }
-  }, userController.adminCreateUser.bind(userController));
+  fastify.post('/register', { schema: schemas.registerSchema }, userController.register.bind(userController));
+  fastify.post('/login', { schema: schemas.loginSchema }, userController.login.bind(userController));
+  fastify.patch('/users/me/password', { preHandler: [authenticate], schema: schemas.updatePasswordSchema }, userController.updatePassword.bind(userController));
+  fastify.get('/users', { preHandler: [authenticate], schema: schemas.listAllUsersSchema }, userController.listAll.bind(userController));
+  fastify.patch('/users/:id/role', { preHandler: [authenticate, isAdmin], schema: schemas.updateRoleSchema }, userController.updateRole.bind(userController));
+  fastify.delete('/users/:id', { preHandler: [authenticate, isAdmin], schema: schemas.deleteUserSchema }, userController.delete.bind(userController));
+  fastify.post('/users/admin-create', { preHandler: [authenticate, isAdmin], schema: schemas.adminCreateUserSchema }, userController.adminCreateUser.bind(userController));
 
   // ==========================================
   // ROTAS DE RECUPERAÇÃO DE SENHA (ESQUECI A SENHA)
   // ==========================================
-
-  fastify.post('/password-resets/request', {
-    schema: {
-      description: 'Cria uma solicitação de redefinição de senha pendente para aprovação do TI.',
-      tags: ['Autenticação'],
-      body: {
-        type: 'object',
-        required: ['email'],
-        properties: {
-          email: { type: 'string', format: 'email' }
-        }
-      },
-      response: {
-        200: successMessage,
-        400: errorResponse
-      }
-    }
-  }, userController.requestReset.bind(userController));
-
-  fastify.get('/password-resets', {
-    preHandler: [authenticate, isAdmin],
-    schema: {
-      description: 'Lista todas as solicitações de senha atualmente pendentes de análise.',
-      tags: ['Usuários'],
-      response: {
-        200: {
-          type: 'array',
-          items: {
-            type: 'object',
-            properties: {
-              id: { type: 'integer' },
-              userId: { type: 'integer' },
-              nome: { type: 'string' },
-              email: { type: 'string' },
-              dataSolicitacao: { type: 'string' }
-            }
-          }
-        },
-        401: errorResponse,
-        403: errorResponse,
-        500: errorResponse
-      }
-    }
-  }, userController.getResetRequests.bind(userController));
-
-  fastify.get('/password-resets/history', { 
-    preHandler: [authenticate, isAdmin], 
-    schema: { tags: ['Usuários'] } }, 
-    userController.getResetHistory.bind(userController));
-
-  fastify.post('/password-resets/:id/approve', {
-    preHandler: [authenticate, isAdmin],
-    schema: {
-      description: 'Aprova o pedido, gera uma nova senha forte aleatória e remove o pedido da lista.',
-      tags: ['Usuários'],
-      params: {
-        type: 'object',
-        required: ['id'],
-        properties: { id: { type: 'integer' } }
-      },
-      response: {
-        200: successMessage,
-        400: errorResponse,
-        401: errorResponse,
-        403: errorResponse
-      }
-    }
-  }, userController.approveReset.bind(userController));
-
-  fastify.post('/password-resets/:id/reject', {
-    preHandler: [authenticate, isAdmin],
-    schema: {
-      description: 'Recusa a solicitação de redefinição de senha e a remove da lista.',
-      tags: ['Usuários'],
-      params: {
-        type: 'object',
-        required: ['id'],
-        properties: { id: { type: 'integer' } }
-      },
-      response: {
-        200: successMessage,
-        400: errorResponse,
-        401: errorResponse,
-        403: errorResponse
-      }
-    }
-  }, userController.rejectReset.bind(userController));
+  fastify.post('/password-resets/request', { schema: schemas.requestResetSchema }, userController.requestReset.bind(userController));
+  fastify.get('/password-resets', { preHandler: [authenticate, isAdmin], schema: schemas.getResetRequestsSchema }, userController.getResetRequests.bind(userController));
+  fastify.get('/password-resets/history', { preHandler: [authenticate, isAdmin], schema: { tags: ['Usuários'] } }, userController.getResetHistory.bind(userController));
+  fastify.post('/password-resets/:id/approve', { preHandler: [authenticate, isAdmin], schema: schemas.approveResetSchema }, userController.approveReset.bind(userController));
+  fastify.post('/password-resets/:id/reject', { preHandler: [authenticate, isAdmin], schema: schemas.rejectResetSchema }, userController.rejectReset.bind(userController));
 
   // ==========================================
   // ROTAS DE EQUIPAMENTOS
   // ==========================================
-  
-  fastify.get('/equipments', {
-    preHandler: [authenticate],
-    schema: {
-      description: 'Lista todos os equipamentos cadastrados na prefeitura.',
-      tags: ['Equipamentos'],
-      response: {
-        200: { type: 'array', items: { $ref: 'Equipment#' } },
-        401: errorResponse,
-        500: errorResponse
-      }
-    }
-  }, equipmentController.list.bind(equipmentController));
-
-  fastify.post('/equipments', {
-    preHandler: [authenticate, isAdmin],
-    schema: {
-      description: 'Cadastra um novo equipamento pelo número do patrimônio.',
-      tags: ['Equipamentos'],
-      body: {
-        type: 'object',
-        required: ['patrimonio', 'tipo'],
-        properties: {
-          patrimonio: { type: 'string', maxLength: 7 },
-          tipo: { type: 'string' },
-          observacao: { type: 'string' }
-        }
-      },
-      response: {
-        201: { $ref: 'Equipment#' },
-        400: errorResponse,
-        401: errorResponse,
-        403: errorResponse
-      }
-    }
-  }, equipmentController.create.bind(equipmentController));
-
-  fastify.put('/equipments/:id', {
-    preHandler: [authenticate, isAdmin],
-    schema: {
-      description: 'Atualiza dados de um equipamento existente.',
-      tags: ['Equipamentos'],
-      params: {
-        type: 'object',
-        required: ['id'],
-        properties: { id: { type: 'integer' } }
-      },
-      body: {
-        type: 'object',
-        properties: {
-          tipo: { type: 'string' },
-          observacao: { type: 'string' },
-          status: { type: 'string' }
-        }
-      },
-      response: {
-        200: successMessage,
-        400: errorResponse,
-        401: errorResponse,
-        403: errorResponse
-      }
-    }
-  }, equipmentController.update.bind(equipmentController));
-
-  fastify.delete('/equipments/:id', {
-    preHandler: [authenticate, isAdmin],
-    schema: {
-      description: 'Remove um equipamento do sistema (Soft Delete).',
-      tags: ['Equipamentos'],
-      params: {
-        type: 'object',
-        required: ['id'],
-        properties: { id: { type: 'integer' } }
-      },
-      response: {
-        200: successMessage,
-        400: errorResponse,
-        401: errorResponse,
-        403: errorResponse
-      }
-    }
-  }, equipmentController.delete.bind(equipmentController));
+  fastify.get('/equipments', { preHandler: [authenticate], schema: schemas.listEquipmentsSchema }, equipmentController.list.bind(equipmentController));
+  fastify.post('/equipments', { preHandler: [authenticate, isAdmin], schema: schemas.createEquipmentSchema }, equipmentController.create.bind(equipmentController));
+  fastify.put('/equipments/:id', { preHandler: [authenticate, isAdmin], schema: schemas.updateEquipmentSchema }, equipmentController.update.bind(equipmentController));
+  fastify.delete('/equipments/:id', { preHandler: [authenticate, isAdmin], schema: schemas.deleteEquipmentSchema }, equipmentController.delete.bind(equipmentController));
 
   // ==========================================
   // ROTAS DE CHAMADOS (TICKETS)
   // ==========================================
-  
-  fastify.get('/tickets', {
-    preHandler: [authenticate],
-    schema: {
-      description: 'Lista todos os chamados abertos e resolvidos.',
-      tags: ['Chamados'],
-      response: {
-        200: { type: 'array', items: { $ref: 'Ticket#' } },
-        401: errorResponse,
-        500: errorResponse
-      }
-    }
-  }, ticketController.listAll.bind(ticketController));
-
-  fastify.get('/tickets/me', {
-    preHandler: [authenticate],
-    schema: {
-      description: 'Lista apenas os chamados abertos pelo usuário que está logado.',
-      tags: ['Chamados'],
-      response: {
-        200: { type: 'array', items: { $ref: 'Ticket#' } },
-        401: errorResponse,
-        500: errorResponse
-      }
-    }
-  }, ticketController.listMyTickets.bind(ticketController));
-
-  fastify.post('/tickets', {
-    preHandler: [authenticate],
-    schema: {
-      description: 'Abre um novo chamado de manutenção usando a plaqueta do patrimônio.',
-      tags: ['Chamados'],
-      body: {
-        type: 'object',
-        required: ['patrimonio', 'descricao_problema', 'tipo', 'localizacao'],
-        properties: {
-          patrimonio: { type: 'string', maxLength: 7 },
-          descricao_problema: { type: 'string' },
-          tipo: { type: 'string' },        
-          localizacao: { type: 'string' },
-          tecnico_id: { type: 'integer', nullable: true } // NOVO: Libera a passagem do técnico
-        }
-      },
-      response: {
-        201: { $ref: 'Ticket#' },
-        400: errorResponse,
-        401: errorResponse
-      }
-    }
-  }, ticketController.open.bind(ticketController));
-
-  fastify.put('/tickets/:id', {
-    preHandler: [authenticate],
-    schema: {
-      description: 'Permite ao funcionário comum editar o chamado inteiro antes da conclusão.',
-      tags: ['Chamados'],
-      params: {
-        type: 'object',
-        required: ['id'],
-        properties: { id: { type: 'integer' } }
-      },
-      body: {
-        type: 'object',
-        required: ['descricao_problema', 'patrimonio', 'tipo', 'localizacao'],
-        properties: {
-          descricao_problema: { type: 'string' },
-          patrimonio: { type: 'string', maxLength: 7 },
-          tipo: { type: 'string' },        
-          localizacao: { type: 'string' },
-          tecnico_id: { type: 'integer', nullable: true } // <-- NOVO: Libera a edição do técnico!
-        }
-      },
-      response: {
-        200: { $ref: 'Ticket#' },
-        400: errorResponse,
-        401: errorResponse
-      }
-    }
-  }, ticketController.update.bind(ticketController));
-
-  fastify.patch('/tickets/:id/status', {
-    preHandler: [authenticate, isAdmin],
-    schema: {
-      description: 'Altera o status do chamado e reflete no equipamento físico.',
-      tags: ['Chamados'],
-      params: {
-        type: 'object',
-        required: ['id'],
-        properties: { id: { type: 'integer' } }
-      },
-      body: {
-        type: 'object',
-        required: ['status_chamado'],
-        properties: {
-          status_chamado: { type: 'string', enum: ['Aberto', 'Concluído', 'Baixa', 'Cancelado'] },
-          resolucao_ti: { type: 'string', nullable: true }
-        }
-      },
-      response: {
-        200: { $ref: 'Ticket#' },
-        400: errorResponse,
-        401: errorResponse,
-        403: errorResponse
-      }
-    }
-  }, ticketController.updateStatus.bind(ticketController));
-
-  fastify.patch('/tickets/:id/assign', {
-    preHandler: [authenticate], 
-    schema: {
-      description: 'Atribui um técnico de suporte a um chamado específico.',
-      tags: ['Chamados'],
-      params: {
-        type: 'object',
-        required: ['id'],
-        properties: { id: { type: 'integer' } }
-      },
-      body: {
-        type: 'object',
-        required: ['tecnico_id'],
-        properties: { tecnico_id: { type: 'integer', nullable: true } }
-      },
-      response: {
-        200: { $ref: 'Ticket#' },
-        400: errorResponse,
-        401: errorResponse,
-        403: errorResponse
-      }
-    }
-  }, ticketController.assignTechnician.bind(ticketController));
-
-  fastify.patch('/tickets/:id/cancel', {
-    preHandler: [authenticate],
-    schema: {
-      description: 'Permite ao próprio funcionário cancelar seu chamado informando um motivo.',
-      tags: ['Chamados'],
-      params: {
-        type: 'object',
-        required: ['id'],
-        properties: { id: { type: 'integer' } }
-      },
-      body: {
-        type: 'object',
-        required: ['motivo'],
-        properties: { motivo: { type: 'string' } }
-      },
-      response: {
-        200: { $ref: 'Ticket#' },
-        400: errorResponse
-      }
-    }
-  }, ticketController.cancel.bind(ticketController));
+  fastify.get('/tickets', { preHandler: [authenticate], schema: schemas.listAllTicketsSchema }, ticketController.listAll.bind(ticketController));
+  fastify.get('/tickets/me', { preHandler: [authenticate], schema: schemas.listMyTicketsSchema }, ticketController.listMyTickets.bind(ticketController));
+  fastify.post('/tickets', { preHandler: [authenticate], schema: schemas.openTicketSchema }, ticketController.open.bind(ticketController));
+  fastify.put('/tickets/:id', { preHandler: [authenticate], schema: schemas.updateTicketSchema }, ticketController.update.bind(ticketController));
+  fastify.patch('/tickets/:id/status', { preHandler: [authenticate, isAdmin], schema: schemas.updateTicketStatusSchema }, ticketController.updateStatus.bind(ticketController));
+  fastify.patch('/tickets/:id/assign', { preHandler: [authenticate], schema: schemas.assignTechnicianSchema }, ticketController.assignTechnician.bind(ticketController));
+  fastify.patch('/tickets/:id/cancel', { preHandler: [authenticate], schema: schemas.cancelTicketSchema }, ticketController.cancel.bind(ticketController));
 
   // ==========================================
   // ROTA SSE (REALTIME)
   // ==========================================
-  
-  fastify.get('/stream', {
-    schema: {
-      description: 'Rota SSE para atualizações em tempo real.',
-      tags: ['Realtime'],
-    }
-  }, (request, reply) => {
+  fastify.get('/stream', { schema: { description: 'Rota SSE para atualizações em tempo real.', tags: ['Realtime'] } }, (request, reply) => {
     reply.raw.setHeader('Content-Type', 'text/event-stream');
     reply.raw.setHeader('Cache-Control', 'no-cache');
     reply.raw.setHeader('Connection', 'keep-alive');
@@ -583,10 +63,7 @@ fastify.post('/users/admin-create', {
     reply.raw.flushHeaders();
 
     sseService.addClient(reply.raw);
-
-    request.raw.on('close', () => {
-      sseService.removeClient(reply.raw);
-    });
+    request.raw.on('close', () => sseService.removeClient(reply.raw));
   });
 
 };

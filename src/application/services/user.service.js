@@ -2,57 +2,12 @@ const userRepository = require('../../infra/db/sequelize/repository/user.reposit
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const env = require('../../core/env');
-const crypto = require('crypto');
 
-const ALGORITHM = 'aes-256-cbc';
-const CRYPTO_SECRET = process.env.CRYPTO_SECRET || '12345678901234567890123456789012'; 
+// BUSCANDO OS UTILS NO CAMINHO EXATO DA SUA ESTRUTURA 🚀
+const { encryptEmail, decryptEmail, ofuscarEmail, gerarSenhaAutomatica } = require('../../core/utils/auth.utils');
 
-const encryptEmail = (text) => {
-  if (!text) return text;
-  const iv = crypto.randomBytes(16);
-  const cipher = crypto.createCipheriv(ALGORITHM, Buffer.from(CRYPTO_SECRET), iv);
-  let encrypted = cipher.update(text.toLowerCase());
-  encrypted = Buffer.concat([encrypted, cipher.final()]);
-  return iv.toString('hex') + ':' + encrypted.toString('hex');
-};
-
-const decryptEmail = (text) => {
-  if (!text || !text.includes(':')) return text;
-  try {
-    const textParts = text.split(':');
-    const iv = Buffer.from(textParts.shift(), 'hex');
-    const encryptedText = Buffer.from(textParts.join(':'), 'hex');
-    const decipher = crypto.createDecipheriv(ALGORITHM, Buffer.from(CRYPTO_SECRET), iv);
-    let decrypted = decipher.update(encryptedText);
-    decrypted = Buffer.concat([decrypted, decipher.final()]);
-    return decrypted.toString();
-  } catch (error) {
-    return text;
-  }
-};
-
-const ofuscarEmail = (emailLimpo) => {
-  const [nome, dominio] = emailLimpo.split('@');
-  if (!nome || !dominio) return emailLimpo;
-  const showChars = Math.min(2, nome.length);
-  return `${nome.substring(0, showChars)}***@${dominio}`;
-};
-
-const gerarSenhaAutomatica = () => {
-  const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%&*";
-  const length = Math.floor(Math.random() * (12 - 8 + 1)) + 8;
-  let senha = "";
-  for (let i = 0; i < length; i++) {
-    senha += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return senha;
-};
-
-// ==========================================
-// ARMAZENAMENTO EM MEMÓRIA
-// ==========================================
 let pendentesReset = []; 
-let historicoReset = []; // NOVO: Guarda os últimos 5 processados
+let historicoReset = []; 
 
 class UserService {
   async createUser(data) {
@@ -104,8 +59,6 @@ class UserService {
     return await userRepository.update(id, { senha: hashedPassword });
   }
 
-  // --- RECOVERY FLOWS ---
-
   async requestPasswordReset(emailInput) {
     const allUsers = await userRepository.findAll();
     const user = allUsers.find(u => decryptEmail(u.email) === emailInput.toLowerCase());
@@ -126,14 +79,8 @@ class UserService {
     return true;
   }
 
-  async getPendingResets() {
-    return pendentesReset;
-  }
-
-  // NOVO MÉTODO: Retorna os últimos 5 do histórico
-  async getResetHistory() {
-    return historicoReset;
-  }
+  async getPendingResets() { return pendentesReset; }
+  async getResetHistory() { return historicoReset; }
 
   async approvePasswordReset(resetId) {
     const index = pendentesReset.findIndex(p => p.id === parseInt(resetId));
@@ -152,13 +99,8 @@ class UserService {
 
     console.log(`[DEV] Senha do Usuário ${user.nome} resetada pelo Admin! Nova Senha: ${novaSenha}`);
 
-    // Salva no histórico antes de remover da fila de pendentes
-    historicoReset.unshift({
-      ...solicitacao,
-      status: 'Aprovado',
-      dataProcessamento: new Date().toISOString()
-    });
-    if (historicoReset.length > 5) historicoReset.pop(); // Trava estrita em 5 itens
+    historicoReset.unshift({ ...solicitacao, status: 'Aprovado', dataProcessamento: new Date().toISOString() });
+    if (historicoReset.length > 5) historicoReset.pop(); 
 
     pendentesReset.splice(index, 1);
     return true;
@@ -170,16 +112,19 @@ class UserService {
     
     const solicitacao = pendentesReset[index];
 
-    // Salva no histórico como Recusado
-    historicoReset.unshift({
-      ...solicitacao,
-      status: 'Recusado',
-      dataProcessamento: new Date().toISOString()
-    });
+    historicoReset.unshift({ ...solicitacao, status: 'Recusado', dataProcessamento: new Date().toISOString() });
     if (historicoReset.length > 5) historicoReset.pop();
 
     pendentesReset.splice(index, 1);
     return true;
+  }
+
+  async updateRole(id, role) {
+    return await userRepository.update(id, { role });
+  }
+
+  async deleteUser(id) {
+    return await userRepository.delete(id);
   }
 }
 

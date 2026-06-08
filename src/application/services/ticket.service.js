@@ -2,7 +2,20 @@ const ticketRepository = require('../../infra/db/sequelize/repository/ticket.rep
 const equipmentRepository = require('../../infra/db/sequelize/repository/equipment.repository');
 const sseService = require('./sse.service');
 
+// Mapeamento estático para enxugar o if/else de alteração de status
+const STATUS_EQUIPAMENTO_MAP = {
+  'Concluído': 'Disponível',
+  'Baixa': 'Baixa'
+};
+
 class TicketService {
+  // Helper interno para evitar repetir a validação de existência do chamado
+  async _buscarChamadoOuFalhar(id) {
+    const ticket = await ticketRepository.findById(id);
+    if (!ticket) throw new Error('Chamado não encontrado.');
+    return ticket;
+  }
+
   async openTicket(data) {
     let equipment = await equipmentRepository.findByPatrimonio(data.patrimonio);
     
@@ -18,15 +31,13 @@ class TicketService {
       await equipmentRepository.update(equipment.id, { status: 'Em Manutenção' });
     }
 
-    const ticketData = {
+    const newTicket = await ticketRepository.create({
       descricao_problema: data.descricao_problema,
       equipment_id: equipment.id,
       user_id: data.user_id,
       status_chamado: 'Aberto',
-      tecnico_id: data.tecnico_id || null // <-- CORRIGIDO AQUI: Agora ele salva o técnico na criação!
-    };
-
-    const newTicket = await ticketRepository.create(ticketData);
+      tecnico_id: data.tecnico_id || null
+    });
     
     sseService.broadcast({ action: 'RELOAD_DATA' }); 
     return newTicket;
@@ -36,23 +47,19 @@ class TicketService {
     return await ticketRepository.findAll();
   }
 
-// NOVA FUNÇÃO: Permite editar o chamado por completo com lógica inteligente de patrimônio
   async updateTicketInfo(id, data) {
-    const ticket = await ticketRepository.findById(id);
-    if (!ticket) throw new Error('Chamado não encontrado.');
+    const ticket = await this._buscarChamadoOuFalhar(id);
 
-    if (ticket.status_chamado === 'Concluído' || ticket.status_chamado === 'Baixa') {
+    if (['Concluído', 'Baixa'].includes(ticket.status_chamado)) {
       throw new Error('Operação negada: Chamados finalizados não podem ser editados.');
     }
 
     let equipment_id = ticket.equipment_id;
 
     if (data.patrimonio) {
-      let equipmentDestino = await equipmentRepository.findByPatrimonio(data.patrimonio);
+      const equipmentDestino = await equipmentRepository.findByPatrimonio(data.patrimonio);
 
       if (!equipmentDestino) {
-        // Cenário 1: O patrimônio não existe. Foi um erro de digitação!
-        // Atualiza a máquina atual em vez de criar uma nova.
         await equipmentRepository.update(equipment_id, {
           patrimonio: data.patrimonio,
           tipo: data.tipo,
@@ -60,8 +67,6 @@ class TicketService {
           criado_por: 'Usuário (Via Chamado)'
         });
       } else {
-        // Cenário 2: O usuário alterou para uma máquina que já existe no banco.
-        // Vincula o chamado a ela e atualiza suas informações.
         await equipmentRepository.update(equipmentDestino.id, {
           tipo: data.tipo || equipmentDestino.tipo,
           observacao: data.localizacao || equipmentDestino.observacao
@@ -70,63 +75,70 @@ class TicketService {
       }
     }
 
-    // Prepara os dados do chamado para atualizar
     const updatePayload = { 
       descricao_problema: data.descricao_problema,
-      equipment_id: equipment_id 
+      equipment_id 
     };
 
-    // CORRIGIDO AQUI: Se o Frontend mandou a propriedade do técnico na edição, nós a incluímos no pacote!
-    if ('tecnico_id' in data) {
-      updatePayload.tecnico_id = data.tecnico_id;
-    }
+    if ('tecnico_id' in data) updatePayload.tecnico_id = data.tecnico_id;
 
     const updated = await ticketRepository.update(id, updatePayload);
-    
     sseService.broadcast({ action: 'RELOAD_DATA' });
     return updated;
   }
 
   async updateTicketStatus(id, status_chamado, resolucao_ti) {
-    const ticket = await ticketRepository.findById(id);
-    if (!ticket) throw new Error('Chamado não encontrado.');
+    const ticket = await this._buscarChamadoOuFalhar(id);
 
     const updatedTicket = await ticketRepository.update(id, {
       status_chamado,
       resolucao_ti: resolucao_ti || ticket.resolucao_ti 
     });
 
-    let equipamentoStatus = 'Em Manutenção';
-    
-    if (status_chamado === 'Concluído') {
-      equipamentoStatus = 'Disponível';
-    } else if (status_chamado === 'Baixa') {
-      equipamentoStatus = 'Baixa';
-    }
+    // Reduzido de 8 linhas de if/else para apenas 1 linha usando o Objeto Lookup!
+    const equipamentoStatus = STATUS_EQUIPAMENTO_MAP[status_chamado] || 'Em Manutenção';
 
     await equipmentRepository.update(ticket.equipment_id, { status: equipamentoStatus });
-    
-    sseService.broadcast({ action: 'RELOAD_DATA' }); // <-- Atualiza a tela
+    sseService.broadcast({ action: 'RELOAD_DATA' }); 
     return updatedTicket;
   }
 
   async cancelTicket(id, userId, motivo) {
-    const ticket = await ticketRepository.findById(id);
-    if (!ticket) throw new Error('Chamado não encontrado.');
+    const ticket = await this._buscarChamadoOuFalhar(id);
+    
     if (ticket.user_id !== userId) throw new Error('Acesso negado: Você só pode cancelar seus próprios chamados.');
     if (ticket.status_chamado !== 'Aberto') throw new Error('Apenas chamados que ainda estão "Abertos" podem ser cancelados.');
 
-    // Atualiza o chamado
     const updatedTicket = await ticketRepository.update(id, {
       status_chamado: 'Cancelado',
       resolucao_ti: `Cancelado pelo usuário. Justificativa: ${motivo}`
     });
 
-    // Libera o equipamento atrelado para voltar a ficar Disponível
     await equipmentRepository.update(ticket.equipment_id, { status: 'Disponível' });
-
     sseService.broadcast({ action: 'RELOAD_DATA' });
     return updatedTicket;
+  }
+
+  async getMyTickets(userId, role) {
+    const { Ticket, Equipment, User } = require('../../infra/db/sequelize/models');
+    const { Op } = require('sequelize');
+    
+    const whereCondition = role === 'TECH' 
+      ? { [Op.or]: [{ tecnico_id: userId }, { user_id: userId }] }
+      : { user_id: userId };
+
+    return await Ticket.findAll({ 
+      where: whereCondition,
+      include: [
+        { model: Equipment, as: 'equipment' },
+        { model: User, as: 'tecnico', attributes: ['id', 'nome'] }
+      ],
+      order: [['createdAt', 'DESC']]
+    });
+  }
+
+  async assignTechnician(id, tecnico_id) {
+    return await ticketRepository.update(id, { tecnico_id });
   }
 }
 
