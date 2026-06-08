@@ -11,7 +11,18 @@ let historicoReset = [];
 
 class UserService {
   async createUser(data) {
-    data.email = encryptEmail(data.email);
+    // 1. Validar se o e-mail termina com o domínio correto de Itapecerica
+    const emailLimpo = data.email.trim().toLowerCase();
+    if (!emailLimpo.endsWith('@itapecerica.sp.gov.br')) {
+      throw new Error('Acesso negado: O e-mail deve ser institucional (@itapecerica.sp.gov.br).');
+    }
+
+    // 2. Validar se o ramal foi enviado
+    if (!data.ramal || data.ramal.trim() === '') {
+      throw new Error('O número do ramal é obrigatório para o cadastro.');
+    }
+
+    data.email = encryptEmail(emailLimpo);
     const senhaGerada = gerarSenhaAutomatica();
     data.senha = await bcrypt.hash(senhaGerada, 10);
 
@@ -49,7 +60,8 @@ class UserService {
       id: u.id,
       nome: u.nome,
       email: ofuscarEmail(decryptEmail(u.email)),
-      role: u.role
+      role: u.role,
+      ramal: u.ramal // 🌟 ADICIONE ESTA LINHA PARA LIBERAR O RAMAL NA LISTA GERAL!
     }));
   }
 

@@ -9,16 +9,8 @@ class TicketRepository {
     return await Ticket.findAll({
       include: [
         { model: Equipment, as: 'equipment' },
-        { 
-          model: User, 
-          as: 'user', 
-          attributes: ['id', 'nome', 'email']
-        },
-        { 
-          model: User, 
-          as: 'tecnico', 
-          attributes: ['id', 'nome', 'email'] // NOVO: Traz os dados do técnico
-        }
+        { model: User, as: 'user', attributes: ['id', 'nome', 'email', 'ramal'] },
+        { model: User, as: 'tecnico', attributes: ['id', 'nome', 'email', 'ramal'] } // 🌟 Adicionado 'ramal' aqui
       ],
       order: [['createdAt', 'DESC']]
     });
@@ -28,8 +20,8 @@ class TicketRepository {
     return await Ticket.findByPk(id, {
       include: [
         { model: Equipment, as: 'equipment' },
-        { model: User, as: 'user', attributes: ['id', 'nome', 'email'] },
-        { model: User, as: 'tecnico', attributes: ['id', 'nome', 'email'] } // NOVO
+        { model: User, as: 'user', attributes: ['id', 'nome', 'email', 'ramal'] },
+        { model: User, as: 'tecnico', attributes: ['id', 'nome', 'email', 'ramal'] } // 🌟 E aqui
       ]
     });
   }

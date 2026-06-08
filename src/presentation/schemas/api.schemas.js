@@ -35,14 +35,32 @@ const ticketSchema = {
     equipment_id: { type: 'integer' },
     user_id: { type: 'integer' },
     tecnico_id: { type: 'integer', nullable: true },
+    
+    // 🌟 LIBERADO: Objeto do Solicitante com Ramal completo!
+    user: {
+      type: 'object',
+      nullable: true,
+      properties: {
+        id: { type: 'integer' },
+        nome: { type: 'string' },
+        email: { type: 'string' },
+        ramal: { type: 'string' }
+      }
+    },
+    
+    // 🌟 LIBERADO: Objeto do Técnico com Ramal completo!
     tecnico: { 
       type: 'object',
       nullable: true,
       properties: {
         id: { type: 'integer' },
-        nome: { type: 'string' }
+        nome: { type: 'string' },
+        ramal: { type: 'string' }
       }
-    }
+    },
+
+    // 🌟 LIBERADO: Referência ao equipamento para o patrimônio e tipo aparecerem!
+    equipment: { $ref: 'Equipment#' }
   }
 };
 
@@ -86,7 +104,8 @@ const loginSchema = {
             id: { type: 'integer' },
             nome: { type: 'string' },
             email: { type: 'string' },
-            role: { type: 'string' }
+            role: { type: 'string' },
+            ramal: { type: 'string' }
           }
         }
       }
@@ -123,7 +142,8 @@ const listAllUsersSchema = {
           id: { type: 'integer' },
           nome: { type: 'string' },
           email: { type: 'string' },
-          role: { type: 'string' }
+          role: { type: 'string' },
+          ramal: { type: 'string' } // 🌟 LIBERADO: Ramal na listagem geral para o dropdown do Admin
         }
       }
     },
@@ -174,15 +194,16 @@ const deleteUserSchema = {
 };
 
 const adminCreateUserSchema = {
-  description: 'Permite ao ADMIN cadastrar um novo funcionário/técnico manualmente com matrícula.',
+  description: 'Permite ao ADMIN cadastrar um novo funcionário/técnico manualmente com matrícula e ramal.',
   tags: ['Usuários'],
   body: {
     type: 'object',
-    required: ['nome', 'email', 'role', 'matricula'],
+    required: ['nome', 'email', 'role', 'matricula', 'ramal'], 
     properties: {
       nome: { type: 'string' },
       email: { type: 'string', format: 'email' },
       matricula: { type: 'string' },
+      ramal: { type: 'string' }, 
       role: { type: 'string', enum: ['ADMIN', 'USER', 'TECH'] }
     }
   },
@@ -404,7 +425,8 @@ const updateTicketStatusSchema = {
     type: 'object',
     required: ['status_chamado'],
     properties: {
-      status_chamado: { type: 'string', enum: ['Aberto', 'Concluído', 'Baixa', 'Cancelado'] },
+      // 🌟 ATUALIZADO: Incluído 'Em Andamento' nas opções válidas do enum do Fastify
+      status_chamado: { type: 'string', enum: ['Aberto', 'Em Andamento', 'Concluído', 'Baixa', 'Cancelado'] },
       resolucao_ti: { type: 'string', nullable: true }
     }
   },

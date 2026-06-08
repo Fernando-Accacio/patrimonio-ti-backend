@@ -2,14 +2,12 @@ const ticketRepository = require('../../infra/db/sequelize/repository/ticket.rep
 const equipmentRepository = require('../../infra/db/sequelize/repository/equipment.repository');
 const sseService = require('./sse.service');
 
-// Mapeamento estático para enxugar o if/else de alteração de status
 const STATUS_EQUIPAMENTO_MAP = {
   'Concluído': 'Disponível',
   'Baixa': 'Baixa'
 };
 
 class TicketService {
-  // Helper interno para evitar repetir a validação de existência do chamado
   async _buscarChamadoOuFalhar(id) {
     const ticket = await ticketRepository.findById(id);
     if (!ticket) throw new Error('Chamado não encontrado.');
@@ -31,11 +29,14 @@ class TicketService {
       await equipmentRepository.update(equipment.id, { status: 'Em Manutenção' });
     }
 
+    // 🌟 INTELIGÊNCIA: Se já nasce com técnico, nasce 'Em Andamento', senão 'Aberto'
+    const statusInicial = data.tecnico_id ? 'Em Andamento' : 'Aberto';
+
     const newTicket = await ticketRepository.create({
       descricao_problema: data.descricao_problema,
       equipment_id: equipment.id,
       user_id: data.user_id,
-      status_chamado: 'Aberto',
+      status_chamado: statusInicial, 
       tecnico_id: data.tecnico_id || null
     });
     
@@ -80,7 +81,13 @@ class TicketService {
       equipment_id 
     };
 
-    if ('tecnico_id' in data) updatePayload.tecnico_id = data.tecnico_id;
+    if ('tecnico_id' in data) {
+      updatePayload.tecnico_id = data.tecnico_id;
+      // 🌟 INTELIGÊNCIA: Se foi adicionado um técnico na edição e estava Aberto, vai para Em Andamento
+      if (ticket.status_chamado === 'Aberto' && data.tecnico_id) {
+        updatePayload.status_chamado = 'Em Andamento';
+      }
+    }
 
     const updated = await ticketRepository.update(id, updatePayload);
     sseService.broadcast({ action: 'RELOAD_DATA' });
@@ -95,7 +102,6 @@ class TicketService {
       resolucao_ti: resolucao_ti || ticket.resolucao_ti 
     });
 
-    // Reduzido de 8 linhas de if/else para apenas 1 linha usando o Objeto Lookup!
     const equipamentoStatus = STATUS_EQUIPAMENTO_MAP[status_chamado] || 'Em Manutenção';
 
     await equipmentRepository.update(ticket.equipment_id, { status: equipamentoStatus });
@@ -131,14 +137,25 @@ class TicketService {
       where: whereCondition,
       include: [
         { model: Equipment, as: 'equipment' },
-        { model: User, as: 'tecnico', attributes: ['id', 'nome'] }
+        // 🌟 INCLUÍDO: Puxa os dados e o ramal de quem abriu o chamado!
+        { model: User, as: 'user', attributes: ['id', 'nome', 'email', 'ramal'] },
+        // 🌟 ATUALIZADO: Puxa também o ramal do técnico responsável!
+        { model: User, as: 'tecnico', attributes: ['id', 'nome', 'email', 'ramal'] }
       ],
       order: [['createdAt', 'DESC']]
     });
   }
 
   async assignTechnician(id, tecnico_id) {
-    return await ticketRepository.update(id, { tecnico_id });
+    const ticket = await this._buscarChamadoOuFalhar(id);
+    const updatePayload = { tecnico_id };
+
+    // 🌟 INTELIGÊNCIA: Se o Admin/Suporte escolheu um técnico e o status era 'Aberto', vira 'Em Andamento' automaticamente!
+    if (ticket.status_chamado === 'Aberto' && tecnico_id) {
+      updatePayload.status_chamado = 'Em Andamento';
+    }
+
+    return await ticketRepository.update(id, updatePayload);
   }
 }
 
