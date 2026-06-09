@@ -148,11 +148,19 @@ class TicketService {
 
   async assignTechnician(id, tecnico_id) {
     const ticket = await this._buscarChamadoOuFalhar(id);
-    const updatePayload = { tecnico_id };
+    
+    // 🌟 PROTEÇÃO: Converte string vazia "" ou valores inválidos em null para não quebrar o banco
+    const cleanTecnicoId = tecnico_id && tecnico_id !== "" ? parseInt(tecnico_id, 10) : null;
+    
+    const updatePayload = { tecnico_id: cleanTecnicoId };
 
-    // 🌟 INTELIGÊNCIA: Se o Admin/Suporte escolheu um técnico e o status era 'Aberto', vira 'Em Andamento' automaticamente!
-    if (ticket.status_chamado === 'Aberto' && tecnico_id) {
+    // 🌟 INTELIGÊNCIA AUTOMÁTICA:
+    if (ticket.status_chamado === 'Aberto' && cleanTecnicoId) {
+      // Se ganhou técnico e estava Aberto -> Vira Em Andamento
       updatePayload.status_chamado = 'Em Andamento';
+    } else if (ticket.status_chamado === 'Em Andamento' && !cleanTecnicoId) {
+      // Se ficou 'Aguardando...' (null) e estava Em Andamento -> Volta para Aberto automaticamente!
+      updatePayload.status_chamado = 'Aberto';
     }
 
     return await ticketRepository.update(id, updatePayload);

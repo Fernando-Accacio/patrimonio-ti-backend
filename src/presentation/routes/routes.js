@@ -48,8 +48,10 @@ const routes = async (fastify, options) => {
   fastify.get('/tickets/me', { preHandler: [authenticate], schema: schemas.listMyTicketsSchema }, ticketController.listMyTickets.bind(ticketController));
   fastify.post('/tickets', { preHandler: [authenticate], schema: schemas.openTicketSchema }, ticketController.open.bind(ticketController));
   fastify.put('/tickets/:id', { preHandler: [authenticate], schema: schemas.updateTicketSchema }, ticketController.update.bind(ticketController));
+
   fastify.patch('/tickets/:id/status', { preHandler: [authenticate, isAdmin], schema: schemas.updateTicketStatusSchema }, ticketController.updateStatus.bind(ticketController));
-  fastify.patch('/tickets/:id/assign', { preHandler: [authenticate], schema: schemas.assignTechnicianSchema }, ticketController.assignTechnician.bind(ticketController));
+  fastify.patch('/tickets/:id/assign', { preHandler: [authenticate, isAdmin], schema: schemas.assignTechnicianSchema }, ticketController.assignTechnician.bind(ticketController));
+
   fastify.patch('/tickets/:id/cancel', { preHandler: [authenticate], schema: schemas.cancelTicketSchema }, ticketController.cancel.bind(ticketController));
 
   // ==========================================
