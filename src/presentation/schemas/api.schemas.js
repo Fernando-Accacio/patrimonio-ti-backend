@@ -73,7 +73,7 @@ const registerSchema = {
     properties: {
       nome: { type: 'string' },
       email: { type: 'string', format: 'email' },
-      role: { type: 'string', enum: ['ADMIN', 'USER'] }
+      role: { type: 'string', enum: ['USER'] }
     }
   },
   response: {
@@ -164,7 +164,7 @@ const updateRoleSchema = {
   body: {
     type: 'object',
     required: ['role'],
-    properties: { role: { type: 'string', enum: ['ADMIN', 'USER'] } }
+    properties: { role: { type: 'string', enum: ['ADMIN', 'USER', 'TECH'] } }
   },
   response: {
     200: successMessage,
