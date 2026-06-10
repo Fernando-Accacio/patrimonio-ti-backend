@@ -9,8 +9,18 @@ class TicketRepository {
     return await Ticket.findAll({
       include: [
         { model: Equipment, as: 'equipment' },
-        { model: User, as: 'user', attributes: ['id', 'nome', 'email', 'ramal'] },
-        { model: User, as: 'tecnico', attributes: ['id', 'nome', 'email', 'ramal'] } // 🌟 Adicionado 'ramal' aqui
+        { 
+          model: User, 
+          as: 'user', 
+          attributes: ['id', 'nome', 'email', 'ramal'],
+          paranoid: false // 🌟 CORREÇÃO: Traz o solicitante histórico mesmo se foi removido!
+        },
+        { 
+          model: User, 
+          as: 'tecnico', 
+          attributes: ['id', 'nome', 'email', 'ramal'],
+          paranoid: false // 🌟 CORREÇÃO: Traz o técnico histórico mesmo se foi removido!
+        }
       ],
       order: [['createdAt', 'DESC']]
     });
@@ -20,8 +30,18 @@ class TicketRepository {
     return await Ticket.findByPk(id, {
       include: [
         { model: Equipment, as: 'equipment' },
-        { model: User, as: 'user', attributes: ['id', 'nome', 'email', 'ramal'] },
-        { model: User, as: 'tecnico', attributes: ['id', 'nome', 'email', 'ramal'] } // 🌟 E aqui
+        { 
+          model: User, 
+          as: 'user', 
+          attributes: ['id', 'nome', 'email', 'ramal'],
+          paranoid: false // 🌟 CORREÇÃO: Garante o histórico na busca por ID
+        },
+        { 
+          model: User, 
+          as: 'tecnico', 
+          attributes: ['id', 'nome', 'email', 'ramal'],
+          paranoid: false // 🌟 CORREÇÃO: Garante o histórico na busca por ID
+        }
       ]
     });
   }

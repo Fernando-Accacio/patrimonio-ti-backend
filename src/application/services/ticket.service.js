@@ -29,7 +29,6 @@ class TicketService {
       await equipmentRepository.update(equipment.id, { status: 'Em Manutenção' });
     }
 
-    // 🌟 INTELIGÊNCIA: Se já nasce com técnico, nasce 'Em Andamento', senão 'Aberto'
     const statusInicial = data.tecnico_id ? 'Em Andamento' : 'Aberto';
 
     const newTicket = await ticketRepository.create({
@@ -83,7 +82,6 @@ class TicketService {
 
     if ('tecnico_id' in data) {
       updatePayload.tecnico_id = data.tecnico_id;
-      // 🌟 INTELIGÊNCIA: Se foi adicionado um técnico na edição e estava Aberto, vai para Em Andamento
       if (ticket.status_chamado === 'Aberto' && data.tecnico_id) {
         updatePayload.status_chamado = 'Em Andamento';
       }
@@ -137,10 +135,18 @@ class TicketService {
       where: whereCondition,
       include: [
         { model: Equipment, as: 'equipment' },
-        // 🌟 INCLUÍDO: Puxa os dados e o ramal de quem abriu o chamado!
-        { model: User, as: 'user', attributes: ['id', 'nome', 'email', 'ramal'] },
-        // 🌟 ATUALIZADO: Puxa também o ramal do técnico responsável!
-        { model: User, as: 'tecnico', attributes: ['id', 'nome', 'email', 'ramal'] }
+        { 
+          model: User, 
+          as: 'user', 
+          attributes: ['id', 'nome', 'email', 'ramal'],
+          paranoid: false // 🌟 FIX: Mantém o Solicitante mesmo se removido
+        },
+        { 
+          model: User, 
+          as: 'tecnico', 
+          attributes: ['id', 'nome', 'email', 'ramal'],
+          paranoid: false // 🌟 FIX: Mantém o Técnico mesmo se removido
+        }
       ],
       order: [['createdAt', 'DESC']]
     });
@@ -149,17 +155,13 @@ class TicketService {
   async assignTechnician(id, tecnico_id) {
     const ticket = await this._buscarChamadoOuFalhar(id);
     
-    // 🌟 PROTEÇÃO: Converte string vazia "" ou valores inválidos em null para não quebrar o banco
     const cleanTecnicoId = tecnico_id && tecnico_id !== "" ? parseInt(tecnico_id, 10) : null;
     
     const updatePayload = { tecnico_id: cleanTecnicoId };
 
-    // 🌟 INTELIGÊNCIA AUTOMÁTICA:
     if (ticket.status_chamado === 'Aberto' && cleanTecnicoId) {
-      // Se ganhou técnico e estava Aberto -> Vira Em Andamento
       updatePayload.status_chamado = 'Em Andamento';
     } else if (ticket.status_chamado === 'Em Andamento' && !cleanTecnicoId) {
-      // Se ficou 'Aguardando...' (null) e estava Em Andamento -> Volta para Aberto automaticamente!
       updatePayload.status_chamado = 'Aberto';
     }
 

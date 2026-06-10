@@ -38,7 +38,7 @@ class UserService {
 
   async login(email, senha) {
     const allUsers = await userRepository.findAllWithPassword();
-    const user = allUsers.find(u => decryptEmail(u.email) === email.toLowerCase());
+    const user = allUsers.find(u => decryptEmail(u.email) === email.toLowerCase().trim());
     
     if (!user) throw new Error('Usuário não encontrado.');
     if (!user.senha) throw new Error('Erro interno na autenticação. Contate o administrador.');
@@ -48,9 +48,17 @@ class UserService {
 
     const token = jwt.sign({ id: user.id, role: user.role }, env.app.jwtSecret, { expiresIn: '8h' });
 
+    // 🌟 CORREÇÃO: Removemos o 'ofuscarEmail' daqui para o dono da conta ver seu próprio e-mail!
+    // Aproveitei e deixei o 'ramal' mapeado também para preencher a sua modal se precisar.
     return { 
       token, 
-      user: { id: user.id, nome: user.nome, email: ofuscarEmail(decryptEmail(user.email)), role: user.role } 
+      user: { 
+        id: user.id, 
+        nome: user.nome, 
+        email: decryptEmail(user.email), // 🔓 Agora descriptografa puro para o próprio usuário
+        role: user.role,
+        ramal: user.ramal 
+      } 
     };
   }
 
