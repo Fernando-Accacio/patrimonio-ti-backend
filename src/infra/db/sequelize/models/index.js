@@ -6,7 +6,12 @@ const Sequelize = require('sequelize');
 const process = require('process');
 const basename = path.basename(__filename);
 const env = process.env.NODE_ENV || 'development';
-const config = require(__dirname + '/../config/database.js')[env];
+
+// 🌟 Lendo o seu arquivo database.js original
+const configFile = require(__dirname + '/../config/database.js');
+
+// 🌟 Forçando o 'development' caso o Jest tente rodar no ambiente 'test'
+const config = configFile[env] || configFile['development'];
 const db = {};
 
 let sequelize;
