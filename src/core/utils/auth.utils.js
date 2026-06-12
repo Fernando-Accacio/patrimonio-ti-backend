@@ -3,9 +3,14 @@ const crypto = require('crypto');
 const ALGORITHM = 'aes-256-cbc';
 const CRYPTO_SECRET = process.env.CRYPTO_SECRET || '12345678901234567890123456789012'; 
 
+// 🌟 CORREÇÃO (Criptografia Determinística):
+// Criamos um IV fixo derivado do seu segredo. O mesmo e-mail sempre vai gerar o mesmo código.
+// Assim, a trava de "E-mail Único" (Unique Constraint) do Banco de Dados vai funcionar perfeitamente!
+const getFixedIV = () => crypto.createHash('md5').update(CRYPTO_SECRET).digest();
+
 const encryptEmail = (text) => {
   if (!text) return text;
-  const iv = crypto.randomBytes(16);
+  const iv = getFixedIV(); 
   const cipher = crypto.createCipheriv(ALGORITHM, Buffer.from(CRYPTO_SECRET), iv);
   let encrypted = cipher.update(text.toLowerCase());
   encrypted = Buffer.concat([encrypted, cipher.final()]);
