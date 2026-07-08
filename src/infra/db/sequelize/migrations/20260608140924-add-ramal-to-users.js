@@ -2,14 +2,22 @@
 
 module.exports = {
   async up(queryInterface, Sequelize) {
-    await queryInterface.addColumn('Users', 'ramal', {
-      type: Sequelize.STRING,
-      allowNull: false, // Torna obrigatório no banco
-      defaultValue: 'Não informado' // Valor padrão temporário caso já existam dados
-    });
+    const tableInfo = await queryInterface.describeTable('Users');
+
+    if (!tableInfo.ramal) {
+      await queryInterface.addColumn('Users', 'ramal', {
+        type: Sequelize.STRING,
+        allowNull: false,
+        defaultValue: 'Não informado'
+      });
+    }
   },
 
   async down(queryInterface, Sequelize) {
-    await queryInterface.removeColumn('Users', 'ramal');
+    const tableInfo = await queryInterface.describeTable('Users');
+
+    if (tableInfo.ramal) {
+      await queryInterface.removeColumn('Users', 'ramal');
+    }
   }
 };

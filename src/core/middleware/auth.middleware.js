@@ -2,6 +2,8 @@ const jwt = require('jsonwebtoken');
 const env = require('../env');
 const userRepository = require('../../infra/db/sequelize/repository/user.repository');
 
+const normalizeRole = (role) => String(role || '').trim().toUpperCase();
+
 const authenticate = async (request, reply) => {
   try {
     const token = request.headers.authorization?.replace('Bearer ', '');
@@ -13,7 +15,7 @@ const authenticate = async (request, reply) => {
     // 2. Checagem de Segurança em Tempo Real no Banco
     const dbUser = await userRepository.findById(decoded.id); 
     
-    if (!dbUser || dbUser.role !== decoded.role) {
+    if (!dbUser || normalizeRole(dbUser.role) !== normalizeRole(decoded.role)) {
       throw new Error('Sessão inválida ou permissões alteradas.');
     }
 
@@ -26,10 +28,19 @@ const authenticate = async (request, reply) => {
 };
 
 const isAdmin = async (request, reply) => {
-  // Agora lê com segurança a role direto da instância do banco de dados
-  if (request.user.role !== 'ADMIN' && request.user.role !== 'TECH') {
+  const role = normalizeRole(request.user?.role);
+
+  if (role !== 'ADMIN' && role !== 'TECH') {
     return reply.status(403).send({ error: 'Erro: Acesso negado. Apenas a TI pode realizar esta ação.' });
   }
 };
 
-module.exports = { authenticate, isAdmin };
+const isTi = async (request, reply) => {
+  const role = normalizeRole(request.user?.role);
+
+  if (role !== 'ADMIN' && role !== 'TECH') {
+    return reply.status(403).send({ error: 'Erro: Acesso negado. Apenas a TI pode realizar esta ação.' });
+  }
+};
+
+module.exports = { authenticate, isAdmin, isTi };

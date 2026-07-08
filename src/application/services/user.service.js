@@ -23,11 +23,17 @@ class UserService {
     }
 
     // 2. Validar se o ramal foi enviado
-    if (!data.ramal || data.ramal.trim() === "") {
+    const ramalLimpo = String(data.ramal || "").trim();
+    if (!ramalLimpo) {
       throw new Error("O número do ramal é obrigatório para o cadastro.");
     }
 
+    if (!/^[0-9]{1,11}$/.test(ramalLimpo)) {
+      throw new Error("O número do ramal deve conter de 1 a 11 dígitos.");
+    }
+
     data.email = encryptEmail(emailLimpo);
+    data.ramal = ramalLimpo;
     const senhaGerada = gerarSenhaAutomatica();
     data.senha = await bcrypt.hash(senhaGerada, 10);
 

@@ -73,6 +73,7 @@ const registerSchema = {
     properties: {
       nome: { type: 'string' },
       email: { type: 'string', format: 'email' },
+      ramal: { type: 'string', pattern: '^[0-9]{1,11}$', maxLength: 11 },
       role: { type: 'string', enum: ['USER'] }
     }
   },
@@ -203,7 +204,7 @@ const adminCreateUserSchema = {
       nome: { type: 'string' },
       email: { type: 'string', format: 'email' },
       matricula: { type: 'string' },
-      ramal: { type: 'string' }, 
+      ramal: { type: 'string', pattern: '^[0-9]{1,11}$', maxLength: 11 }, 
       role: { type: 'string', enum: ['ADMIN', 'USER', 'TECH'] }
     }
   },

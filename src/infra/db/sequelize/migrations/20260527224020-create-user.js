@@ -22,6 +22,10 @@ module.exports = {
         type: Sequelize.STRING,
         allowNull: false
       },
+      ramal: {
+        type: Sequelize.STRING,
+        allowNull: false
+      },
       role: {
         type: Sequelize.STRING,
         allowNull: false,

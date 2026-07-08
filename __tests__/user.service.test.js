@@ -27,6 +27,11 @@ describe('Testes Unitários: User Service', () => {
     await expect(userService.createUser(payload)).rejects.toThrow('O número do ramal é obrigatório para o cadastro');
   });
 
+  it('Deve lançar erro se o ramal tiver mais de 11 dígitos', async () => {
+    const payload = { email: 'admin@itapecerica.sp.gov.br', ramal: '123456789012' };
+    await expect(userService.createUser(payload)).rejects.toThrow('O número do ramal deve conter de 1 a 11 dígitos.');
+  });
+
   it('Deve lançar erro de e-mail duplicado se o Sequelize reclamar', async () => {
     bcrypt.hash.mockResolvedValue('hashsenha');
     const erroSequelize = new Error('Unique constraint');
