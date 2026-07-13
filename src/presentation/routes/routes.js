@@ -50,7 +50,7 @@ const routes = async (fastify, options) => {
   fastify.put('/tickets/:id', { preHandler: [authenticate], schema: schemas.updateTicketSchema }, ticketController.update.bind(ticketController));
 
   fastify.patch('/tickets/:id/status', { preHandler: [authenticate], schema: schemas.updateTicketStatusSchema }, ticketController.updateStatus.bind(ticketController));
-  fastify.patch('/tickets/:id/assign', { preHandler: [authenticate, isTi], schema: schemas.assignTechnicianSchema }, ticketController.assignTechnician.bind(ticketController));
+  fastify.patch('/tickets/:id/assign', { preHandler: [authenticate, isAdmin], schema: schemas.assignTechnicianSchema }, ticketController.assignTechnician.bind(ticketController));
 
   fastify.patch('/tickets/:id/confirmar', { preHandler: [authenticate], schema: schemas.responderConfirmacaoSchema }, ticketController.responderConfirmacao.bind(ticketController));
   fastify.patch('/tickets/:id/cancel', { preHandler: [authenticate], schema: schemas.cancelTicketSchema }, ticketController.cancel.bind(ticketController));

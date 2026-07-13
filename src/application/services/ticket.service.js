@@ -47,8 +47,17 @@ class TicketService {
     return await ticketRepository.findAll();
   }
 
-  async updateTicketInfo(id, data) {
+  async updateTicketInfo(id, data, userId, role) {
     const ticket = await this._buscarChamadoOuFalhar(id);
+    const isAdmin = String(role || '').trim().toUpperCase() === 'ADMIN';
+
+    if (!isAdmin && ticket.user_id !== userId) {
+      throw new Error('Acesso negado: apenas o solicitante pode editar este chamado.');
+    }
+
+    if (String(role || '').trim().toUpperCase() === 'TECH' && 'tecnico_id' in data) {
+      throw new Error('Acesso negado: o suporte não pode assumir chamados.');
+    }
 
     if (['Concluído', 'Baixa'].includes(ticket.status_chamado)) {
       throw new Error('Operação negada: Chamados finalizados não podem ser editados.');

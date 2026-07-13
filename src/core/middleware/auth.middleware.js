@@ -32,10 +32,10 @@ const authenticate = async (request, reply) => {
 };
 
 const isAdmin = async (request, reply) => {
-  const role = request.user?.role;
+  const role = normalizeRole(request.user?.role);
 
-  if (!isTiRole(role)) {
-    return reply.status(403).send({ error: 'Erro: Acesso negado. Apenas a TI pode realizar esta ação.' });
+  if (role !== 'ADMIN') {
+    return reply.status(403).send({ error: 'Erro: Acesso negado. Apenas administradores podem realizar esta ação.' });
   }
 };
 

@@ -24,7 +24,7 @@ class TicketController {
   async update(req, res) {
     try {
       const { id } = req.params;
-      const ticketAtualizado = await ticketService.updateTicketInfo(id, req.body);
+      const ticketAtualizado = await ticketService.updateTicketInfo(id, req.body, req.user.id, req.user.role);
       return res.status(200).send(ticketAtualizado);
     } catch (e) { return res.status(400).send({ error: e.message }); }
   }
@@ -40,8 +40,8 @@ class TicketController {
   async updateStatus(req, res) {
     try {
       const role = String(req.user?.role || '').trim().toUpperCase();
-      if (!['ADMIN', 'TECH', 'TI', 'SUPORTE', 'SUPPORT', 'TECNICO', 'TÉCNICO'].includes(role)) {
-        return res.status(403).send({ error: 'Erro: Acesso negado. Apenas a TI pode realizar esta ação.' });
+      if (role !== 'ADMIN') {
+        return res.status(403).send({ error: 'Erro: Acesso negado. Apenas administradores podem realizar esta ação.' });
       }
 
       const { id } = req.params;
