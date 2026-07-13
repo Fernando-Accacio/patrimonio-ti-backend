@@ -2,8 +2,11 @@ const Fastify = require('fastify');
 const cors = require('@fastify/cors');
 const fastifySwagger = require('@fastify/swagger');
 const fastifySwaggerUI = require('@fastify/swagger-ui');
+const cron = require('node-cron'); // 🌟 IMPORT DO CRON
+
 const env = require('./core/env');
 const routes = require('./presentation/routes/routes.js');
+const ticketService = require('./application/services/ticket.service.js'); // 🌟 IMPORT DO SERVICE
 
 const fastify = Fastify({
   logger: {
@@ -62,6 +65,12 @@ fastify.register(routes, { prefix: "/api" });
 
 const start = async () => {
   try {
+    // 🌟 AGENDADOR: Roda todos os dias às 00:00
+    cron.schedule('0 0 * * *', async () => {
+      fastify.log.info('[CRON] Iniciando varredura de chamados pendentes há 3 dias...');
+      await ticketService.autoClosePendingTickets();
+    });
+
     await fastify.listen({ port: env.app.port, host: '0.0.0.0' });
   } catch (err) {
     fastify.log.error(err);

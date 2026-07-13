@@ -3,6 +3,10 @@ const env = require('../env');
 const userRepository = require('../../infra/db/sequelize/repository/user.repository');
 
 const normalizeRole = (role) => String(role || '').trim().toUpperCase();
+const isTiRole = (role) => {
+  const normalized = normalizeRole(role);
+  return ['ADMIN', 'TECH', 'TI', 'SUPORTE', 'SUPPORT', 'TECNICO', 'TÉCNICO'].includes(normalized);
+};
 
 const authenticate = async (request, reply) => {
   try {
@@ -28,17 +32,17 @@ const authenticate = async (request, reply) => {
 };
 
 const isAdmin = async (request, reply) => {
-  const role = normalizeRole(request.user?.role);
+  const role = request.user?.role;
 
-  if (role !== 'ADMIN' && role !== 'TECH') {
+  if (!isTiRole(role)) {
     return reply.status(403).send({ error: 'Erro: Acesso negado. Apenas a TI pode realizar esta ação.' });
   }
 };
 
 const isTi = async (request, reply) => {
-  const role = normalizeRole(request.user?.role);
+  const role = request.user?.role;
 
-  if (role !== 'ADMIN' && role !== 'TECH') {
+  if (!isTiRole(role)) {
     return reply.status(403).send({ error: 'Erro: Acesso negado. Apenas a TI pode realizar esta ação.' });
   }
 };

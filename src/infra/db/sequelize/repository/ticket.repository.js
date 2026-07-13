@@ -20,6 +20,18 @@ class TicketRepository {
           as: 'tecnico', 
           attributes: ['id', 'nome', 'email', 'ramal'],
           paranoid: false // 🌟 CORREÇÃO: Traz o técnico histórico mesmo se foi removido!
+        },
+        {
+          model: User,
+          as: 'finalizador',
+          attributes: ['id', 'nome', 'email', 'ramal'],
+          paranoid: false
+        },
+        {
+          model: User,
+          as: 'confirmador',
+          attributes: ['id', 'nome', 'email', 'ramal'],
+          paranoid: false
         }
       ],
       order: [['createdAt', 'DESC']]
@@ -41,6 +53,18 @@ class TicketRepository {
           as: 'tecnico', 
           attributes: ['id', 'nome', 'email', 'ramal'],
           paranoid: false // 🌟 CORREÇÃO: Garante o histórico na busca por ID
+        },
+        {
+          model: User,
+          as: 'finalizador',
+          attributes: ['id', 'nome', 'email', 'ramal'],
+          paranoid: false
+        },
+        {
+          model: User,
+          as: 'confirmador',
+          attributes: ['id', 'nome', 'email', 'ramal'],
+          paranoid: false
         }
       ]
     });

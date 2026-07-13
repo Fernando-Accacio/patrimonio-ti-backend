@@ -39,9 +39,15 @@ class TicketController {
 
   async updateStatus(req, res) {
     try {
+      const role = String(req.user?.role || '').trim().toUpperCase();
+      if (!['ADMIN', 'TECH', 'TI', 'SUPORTE', 'SUPPORT', 'TECNICO', 'TÉCNICO'].includes(role)) {
+        return res.status(403).send({ error: 'Erro: Acesso negado. Apenas a TI pode realizar esta ação.' });
+      }
+
       const { id } = req.params;
       const { status_chamado, resolucao_ti } = req.body;
-      const ticket = await ticketService.updateTicketStatus(id, status_chamado, resolucao_ti);
+      // 🌟 Passando o ID do usuário que fez a ação!
+      const ticket = await ticketService.updateTicketStatus(id, status_chamado, resolucao_ti, req.user.id);
       return res.status(200).send(ticket);
     } catch (e) { return res.status(400).send({ error: e.message }); }
   }
@@ -64,6 +70,15 @@ class TicketController {
       const userId = req.user.id;
 
       const ticket = await ticketService.cancelTicket(id, userId, motivo);
+      return res.status(200).send(ticket);
+    } catch (e) { return res.status(400).send({ error: e.message }); }
+  }
+
+  async responderConfirmacao(req, res) {
+    try {
+      const { id } = req.params;
+      const { aprovado, motivo } = req.body;
+      const ticket = await ticketService.responderConfirmacao(id, req.user.id, aprovado, motivo);
       return res.status(200).send(ticket);
     } catch (e) { return res.status(400).send({ error: e.message }); }
   }

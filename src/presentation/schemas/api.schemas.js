@@ -13,7 +13,7 @@ const equipmentSchema = {
   type: 'object',
   properties: {
     id: { type: 'integer' },
-    patrimonio: { type: 'string', maxLength: 7 },
+    patrimonio: { type: 'string', maxLength: 11 },
     tipo: { type: 'string' },
     status: { type: 'string' },
     observacao: { type: 'string', nullable: true },
@@ -34,7 +34,26 @@ const ticketSchema = {
     data_abertura: { type: 'string' },
     equipment_id: { type: 'integer' },
     user_id: { type: 'integer' },
+    // ... código existente ...
     tecnico_id: { type: 'integer', nullable: true },
+    
+    // 🌟 NOVAS PROPRIEDADES DA FUNCIONALIDADE DE CONFIRMAÇÃO
+    finished_by: { type: 'integer', nullable: true },
+    confirmed_by: { type: 'integer', nullable: true },
+    rejection_reason: { type: 'string', nullable: true },
+    finished_at: { type: 'string', nullable: true },
+    
+    // Objetos populados para retornar no frontend
+    finalizador: {
+      type: 'object',
+      nullable: true,
+      properties: { id: { type: 'integer' }, nome: { type: 'string' } }
+    },
+    confirmador: {
+      type: 'object',
+      nullable: true,
+      properties: { id: { type: 'integer' }, nome: { type: 'string' } }
+    },
     
     // 🌟 LIBERADO: Objeto do Solicitante com Ramal completo!
     user: {
@@ -294,7 +313,7 @@ const createEquipmentSchema = {
     type: 'object',
     required: ['patrimonio', 'tipo'],
     properties: {
-      patrimonio: { type: 'string', maxLength: 7 },
+      patrimonio: { type: 'string', maxLength: 11 },
       tipo: { type: 'string' },
       observacao: { type: 'string' }
     }
@@ -374,7 +393,7 @@ const openTicketSchema = {
     type: 'object',
     required: ['patrimonio', 'descricao_problema', 'tipo', 'localizacao'],
     properties: {
-      patrimonio: { type: 'string', maxLength: 7 },
+      patrimonio: { type: 'string', maxLength: 11 },
       descricao_problema: { type: 'string' },
       tipo: { type: 'string' },        
       localizacao: { type: 'string' },
@@ -401,7 +420,7 @@ const updateTicketSchema = {
     required: ['descricao_problema', 'patrimonio', 'tipo', 'localizacao'],
     properties: {
       descricao_problema: { type: 'string' },
-      patrimonio: { type: 'string', maxLength: 7 },
+      patrimonio: { type: 'string', maxLength: 11 },
       tipo: { type: 'string' },        
       localizacao: { type: 'string' },
       tecnico_id: { type: 'integer', nullable: true }
@@ -426,8 +445,10 @@ const updateTicketStatusSchema = {
     type: 'object',
     required: ['status_chamado'],
     properties: {
-      // 🌟 ATUALIZADO: Incluído 'Em Andamento' nas opções válidas do enum do Fastify
-      status_chamado: { type: 'string', enum: ['Aberto', 'Em Andamento', 'Concluído', 'Baixa', 'Cancelado'] },
+      status_chamado: { 
+        type: 'string', 
+        enum: ['Aberto', 'Em Andamento', 'Aguardando Confirmação', 'Concluído', 'Baixa', 'Cancelado'] 
+      },
       resolucao_ti: { type: 'string', nullable: true }
     }
   },
@@ -438,6 +459,22 @@ const updateTicketStatusSchema = {
     403: errorResponse
   }
 };
+
+const responderConfirmacaoSchema = {
+  description: 'Permite ao usuário aceitar ou recusar a solução do TI.',
+  tags: ['Chamados'],
+  params: { type: 'object', required: ['id'], properties: { id: { type: 'integer' } } },
+  body: {
+    type: 'object',
+    required: ['aprovado'],
+    properties: {
+      aprovado: { type: 'boolean' },
+      motivo: { type: 'string' } // Necessário se aprovado for false
+    }
+  },
+  response: { 200: { $ref: 'Ticket#' }, 400: errorResponse, 403: errorResponse }
+};
+// Não esqueça de exportá-lo no module.exports no final do arquivo!
 
 const assignTechnicianSchema = {
   description: 'Atribui um técnico de suporte a um chamado específico.',
@@ -503,5 +540,6 @@ module.exports = {
   updateTicketSchema,
   updateTicketStatusSchema,
   assignTechnicianSchema,
-  cancelTicketSchema
+  cancelTicketSchema,
+  responderConfirmacaoSchema
 };
