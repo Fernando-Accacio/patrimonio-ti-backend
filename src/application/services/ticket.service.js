@@ -14,6 +14,66 @@ class TicketService {
     return ticket;
   }
 
+  // 🌟 FUNÇÃO AUXILIAR PARA GERAR O CÓDIGO DE PROCESSO
+  _gerarCodigoProcesso(setor, tipoEquipamento) {
+    // Mapeamento de setores comuns para garantir siglas padronizadas
+    const mapeamentoSetores = {
+      'recursos humanos': 'RH',
+      'tecnologia da informacao': 'TI',
+      'tecnologia da informação': 'TI',
+      'financeiro': 'FIN',
+      'almoxarifado': 'ALM',
+      'almoxarifado central': 'ALM',
+      'comercial': 'COM',
+      'administrativo': 'ADM',
+      'faturamento': 'FAT',
+      'gabinete do prefeito': 'GAB',
+      'gabinete': 'GAB',
+      'saude': 'SAU',
+      'saúde': 'SAU',
+      'educacao': 'EDU',
+      'educação': 'EDU'
+    };
+
+    const normalizedSetor = String(setor || '').trim().toLowerCase()
+      .normalize("NFD").replace(/[\u0300-\u036f]/g, ""); // Remove acentos
+
+    let siglaSetor = mapeamentoSetores[normalizedSetor];
+    
+    if (!siglaSetor) {
+      // Se for um setor customizado digitado, gera uma sigla inteligente com as primeiras letras
+      siglaSetor = normalizedSetor
+        .split(' ')
+        .map(word => word[0])
+        .join('')
+        .toUpperCase()
+        .slice(0, 3);
+      
+      if (siglaSetor.length < 2) {
+        siglaSetor = (normalizedSetor.slice(0, 3) || 'GEN').toUpperCase();
+      }
+    }
+
+    // Mapeamento de tipo de equipamento para sua respectiva letra inicial
+    const mapeamentoEquipamentos = {
+      'computador desktop': 'C',
+      'notebook': 'N',
+      'impressora': 'I',
+      'monitor': 'M',
+      'telefone ip': 'T',
+      'projetor': 'P',
+      'outro': 'O'
+    };
+
+    const normalizedTipo = String(tipoEquipamento || '').trim().toLowerCase();
+    const inicialEquipamento = mapeamentoEquipamentos[normalizedTipo] || 'E'; // 'E' de equipamento genérico
+
+    // Gera um número aleatório de 5 dígitos para garantir unicidade
+    const numAleatorio = Math.floor(10000 + Math.random() * 90000);
+
+    return `${siglaSetor}-${inicialEquipamento}${numAleatorio}`;
+  }
+
   async openTicket(data) {
     let equipment = await equipmentRepository.findByPatrimonio(data.patrimonio);
     
@@ -31,16 +91,52 @@ class TicketService {
 
     const statusInicial = data.tecnico_id ? 'Em Andamento' : 'Aberto';
 
+    // 🌟 VERIFIQUE SE ESSAS LINHAS ESTÃO LÁ:
+    const codigoProcesso = this._gerarCodigoProcesso(data.localizacao, data.tipo);
+    console.log("CÓDIGO GERADO ANTES DE SALVAR:", codigoProcesso); // Adicione isso para testar!
+
     const newTicket = await ticketRepository.create({
       descricao_problema: data.descricao_problema,
       equipment_id: equipment.id,
       user_id: data.user_id,
       status_chamado: statusInicial, 
-      tecnico_id: data.tecnico_id || null
+      tecnico_id: data.tecnico_id || null,
+      data_abertura: new Date(), 
+      codigo_processo: codigoProcesso // 👈 Garanta que ele está sendo passado aqui!
     });
     
+    console.log("CHAMADO SALVO NO BANCO:", newTicket.toJSON()); // Adicione isso também!
+
     sseService.broadcast({ action: 'RELOAD_DATA' }); 
     return newTicket;
+  }
+
+  async cancelTicket(id, userId, motivo) {
+    const ticket = await this._buscarChamadoOuFalhar(id);
+
+    if (ticket.user_id !== userId) {
+      throw new Error('Acesso negado: apenas o solicitante pode cancelar este chamado.');
+    }
+
+    if (['Concluído', 'Baixa', 'Cancelado'].includes(ticket.status_chamado)) {
+      throw new Error('Chamados finalizados ou já cancelados não podem ser alterados.');
+    }
+
+    const payload = {
+      status_chamado: 'Cancelado',
+      // Guarda o motivo do cancelamento para histórico
+      resolucao_ti: `${ticket.resolucao_ti || ''}\n\n[CANCELADO PELO USUÁRIO]: ${motivo}`.trim(),
+      finished_by: userId,
+      finished_at: new Date()
+    };
+
+    const updatedTicket = await ticketRepository.update(id, payload);
+    
+    // Libera o equipamento novamente
+    await equipmentRepository.update(ticket.equipment_id, { status: 'Disponível' });
+
+    sseService.broadcast({ action: 'RELOAD_DATA' });
+    return updatedTicket;
   }
 
   async getAllTickets() {
@@ -110,14 +206,13 @@ class TicketService {
       resolucao_ti: resolucao_ti || ticket.resolucao_ti
     };
 
-    // 🌟 SE O TÉCNICO/ADMIN ENVIOU PARA CONFIRMAÇÃO
     if (statusSolicitado === 'Aguardando Confirmação') {
       payload.finished_by = usuario_logado_id;
-      payload.finished_at = new Date();
+      // 🌟 DATA DE FECHAMENTO (Será diferente da data de abertura!)
+      payload.finished_at = new Date(); 
       payload.confirmed_by = null;
     }
 
-    // Mantemos a segurança caso o admin dê "Baixa" direto
     if (statusSolicitado === 'Baixa') {
       payload.finished_by = usuario_logado_id;
       payload.finished_at = new Date();
@@ -155,10 +250,8 @@ class TicketService {
     } else {
       payload = {
         status_chamado: 'Em Andamento',
-        // Registra o que faltou no log de resolução para o técnico ver
         resolucao_ti: `${ticket.resolucao_ti}\n\n[RECUSADO PELO USUÁRIO]: ${motivo}`,
         rejection_reason: motivo,
-        // Limpa os dados de finalização para o técnico poder finalizar de novo
         finished_by: null, 
         finished_at: null,
         confirmed_by: null
@@ -191,13 +284,13 @@ class TicketService {
           model: User, 
           as: 'user', 
           attributes: ['id', 'nome', 'email', 'ramal'],
-          paranoid: false // 🌟 FIX: Mantém o Solicitante mesmo se removido
+          paranoid: false 
         },
         { 
           model: User, 
           as: 'tecnico', 
           attributes: ['id', 'nome', 'email', 'ramal'],
-          paranoid: false // 🌟 FIX: Mantém o Técnico mesmo se removido
+          paranoid: false 
         }
       ],
       order: [['createdAt', 'DESC']]
@@ -207,6 +300,7 @@ class TicketService {
   async assignTechnician(id, tecnico_id) {
     const ticket = await this._buscarChamadoOuFalhar(id);
     
+    // Converte para número se existir, senão define como null
     const cleanTecnicoId = tecnico_id && tecnico_id !== "" ? parseInt(tecnico_id, 10) : null;
     
     const updatePayload = { tecnico_id: cleanTecnicoId };
@@ -224,7 +318,6 @@ class TicketService {
     const { Ticket, Equipment } = require('../../infra/db/sequelize/models');
     const { Op } = require('sequelize');
 
-    // Calcula a data de 3 dias atrás
     const limiteDias = new Date();
     limiteDias.setDate(limiteDias.getDate() - 3);
 
@@ -233,7 +326,7 @@ class TicketService {
         where: {
           status_chamado: 'Aguardando Confirmação',
           finished_at: {
-            [Op.lt]: limiteDias // A data de finalização tem que ser MENOR (mais antiga) que há 3 dias
+            [Op.lt]: limiteDias 
           }
         }
       });
@@ -244,7 +337,7 @@ class TicketService {
         await ticket.update({
           status_chamado: 'Concluído',
           resolucao_ti: `${ticket.resolucao_ti}\n\n[SISTEMA]: Chamado finalizado automaticamente após 3 dias sem confirmação do solicitante.`,
-          confirmed_by: null // Indica que não foi o usuário, mas o sistema
+          confirmed_by: null 
         });
         
         await equipmentRepository.update(ticket.equipment_id, { status: 'Disponível' });

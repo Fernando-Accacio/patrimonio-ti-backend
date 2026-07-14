@@ -34,14 +34,13 @@ const ticketSchema = {
     data_abertura: { type: 'string' },
     equipment_id: { type: 'integer' },
     user_id: { type: 'integer' },
-    // ... código existente ...
     tecnico_id: { type: 'integer', nullable: true },
     
-    // 🌟 NOVAS PROPRIEDADES DA FUNCIONALIDADE DE CONFIRMAÇÃO
     finished_by: { type: 'integer', nullable: true },
     confirmed_by: { type: 'integer', nullable: true },
     rejection_reason: { type: 'string', nullable: true },
     finished_at: { type: 'string', nullable: true },
+    codigo_processo: { type: 'string', nullable: true },
     
     // Objetos populados para retornar no frontend
     finalizador: {
