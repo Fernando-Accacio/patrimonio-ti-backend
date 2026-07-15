@@ -54,6 +54,7 @@ const routes = async (fastify, options) => {
 
   fastify.patch('/tickets/:id/confirmar', { preHandler: [authenticate], schema: schemas.responderConfirmacaoSchema }, ticketController.responderConfirmacao.bind(ticketController));
   fastify.patch('/tickets/:id/cancel', { preHandler: [authenticate], schema: schemas.cancelTicketSchema }, ticketController.cancel.bind(ticketController));
+  fastify.patch('/tickets/:id/devolver', { preHandler: [authenticate, isTi] }, ticketController.devolverChamado.bind(ticketController));
 
   // ==========================================
   // ROTA SSE (REALTIME)

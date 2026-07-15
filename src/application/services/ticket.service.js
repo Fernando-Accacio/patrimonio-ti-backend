@@ -151,19 +151,20 @@ class TicketService {
       throw new Error('Acesso negado: apenas o solicitante pode editar este chamado.');
     }
 
-    if (String(role || '').trim().toUpperCase() === 'TECH' && 'tecnico_id' in data) {
-      throw new Error('Acesso negado: o suporte não pode assumir chamados.');
-    }
-
     if (['Concluído', 'Baixa'].includes(ticket.status_chamado)) {
       throw new Error('Operação negada: Chamados finalizados não podem ser editados.');
+    }
+
+    // 🌟 CAPTURA E SALVA A RESPOSTA DO USUÁRIO NO HISTÓRICO DE RESOLUÇÃO
+    let resolucao_ti = ticket.resolucao_ti || '';
+    if (data.resposta_observacao) {
+      resolucao_ti += `\n\n[CONFIRMAÇÃO DO USUÁRIO]: ${data.resposta_observacao}`;
     }
 
     let equipment_id = ticket.equipment_id;
 
     if (data.patrimonio) {
       const equipmentDestino = await equipmentRepository.findByPatrimonio(data.patrimonio);
-
       if (!equipmentDestino) {
         await equipmentRepository.update(equipment_id, {
           patrimonio: data.patrimonio,
@@ -182,7 +183,8 @@ class TicketService {
 
     const updatePayload = { 
       descricao_problema: data.descricao_problema,
-      equipment_id 
+      equipment_id,
+      resolucao_ti // Grava a resolução com o diálogo atualizado
     };
 
     if ('tecnico_id' in data) {
@@ -312,6 +314,41 @@ class TicketService {
     }
 
     return await ticketRepository.update(id, updatePayload);
+  }
+
+  async devolverChamado(id, adminId, observacao, patrimonioAtualizado) {
+    const ticket = await this._buscarChamadoOuFalhar(id);
+
+    if (['Concluído', 'Baixa', 'Cancelado'].includes(ticket.status_chamado)) {
+      throw new Error('Chamados finalizados não podem ser alterados.');
+    }
+
+    let payload = {};
+    let equipment_id = ticket.equipment_id;
+
+    // 1. Atualizar o Patrimônio se ele foi alterado no modal
+    if (patrimonioAtualizado) {
+      const equipmentDestino = await equipmentRepository.findByPatrimonio(patrimonioAtualizado);
+      if (!equipmentDestino) {
+        // Se o patrimônio digitado não existe, altera o atual (corrige o erro de digitação do usuário)
+        await equipmentRepository.update(equipment_id, { patrimonio: patrimonioAtualizado });
+      } else {
+        // Se o patrimônio já existe no banco, apenas vincula o chamado a ele
+        equipment_id = equipmentDestino.id;
+        payload.equipment_id = equipment_id;
+      }
+    }
+
+    // 2. Se o Admin escreveu uma observação, devolve pra fila
+    if (observacao && observacao.trim() !== '') {
+      payload.status_chamado = 'Aberto';
+      payload.tecnico_id = null; // Remove do técnico, pois voltou pro suporte nível 1
+      payload.resolucao_ti = `${ticket.resolucao_ti || ''}\n\n[OBSERVAÇÃO DO SUPORTE]: ${observacao}`.trim();
+    }
+
+    // Salva as alterações no banco
+    const updatedTicket = await ticketRepository.update(id, payload);
+    return updatedTicket;
   }
 
   async autoClosePendingTickets() {

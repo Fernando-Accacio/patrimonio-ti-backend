@@ -24,9 +24,12 @@ class TicketController {
   async update(req, res) {
     try {
       const { id } = req.params;
+      // 🌟 O req.body precisa conter o 'resposta_observacao' enviado pelo front
       const ticketAtualizado = await ticketService.updateTicketInfo(id, req.body, req.user.id, req.user.role);
       return res.status(200).send(ticketAtualizado);
-    } catch (e) { return res.status(400).send({ error: e.message }); }
+    } catch (e) { 
+      return res.status(400).send({ error: e.message }); 
+    }
   }
 
   async listMyTickets(req, res) {
@@ -81,6 +84,20 @@ class TicketController {
       const ticket = await ticketService.responderConfirmacao(id, req.user.id, aprovado, motivo);
       return res.status(200).send(ticket);
     } catch (e) { return res.status(400).send({ error: e.message }); }
+  }
+
+  async devolverChamado(req, res) {
+    try {
+      const { id } = req.params;
+      const { observacao, patrimonio } = req.body; // Recebendo o patrimônio como string solta!
+      
+      const ticket = await ticketService.devolverChamado(id, req.user.id, observacao, patrimonio);
+      
+      sseService.broadcast({ action: 'RELOAD_DATA' });
+      return res.status(200).send(ticket);
+    } catch (e) { 
+      return res.status(400).send({ error: e.message }); 
+    }
   }
 }
 
