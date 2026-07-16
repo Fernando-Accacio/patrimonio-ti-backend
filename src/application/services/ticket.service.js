@@ -1,6 +1,7 @@
 const ticketRepository = require('../../infra/db/sequelize/repository/ticket.repository');
 const equipmentRepository = require('../../infra/db/sequelize/repository/equipment.repository');
 const sseService = require('./sse.service');
+const { Sector, EquipmentType } = require('../../infra/db/sequelize/models');
 
 const STATUS_EQUIPAMENTO_MAP = {
   'Concluído': 'Disponível',
@@ -75,14 +76,20 @@ class TicketService {
   }
 
   async openTicket(data) {
+    // 🌟 1. Busca os dados reais no banco usando os IDs enviados pelo front
+    const setor = await Sector.findByPk(data.sector_id);
+    const tipoEqp = await EquipmentType.findByPk(data.equipment_type_id);
+
+    if (!setor || !tipoEqp) throw new Error('Setor ou Tipo de Equipamento inválido.');
+
     let equipment = await equipmentRepository.findByPatrimonio(data.patrimonio);
     
     if (!equipment) {
       equipment = await equipmentRepository.create({
         patrimonio: data.patrimonio,
-        tipo: data.tipo,              
+        equipment_type_id: data.equipment_type_id, // 🌟 Salva o ID da FK
+        sector_id: data.sector_id,                 // 🌟 Salva o ID da FK
         status: 'Em Manutenção',
-        observacao: data.localizacao,
         criado_por: 'Usuário (Via Chamado)'
       });
     } else {
@@ -91,9 +98,8 @@ class TicketService {
 
     const statusInicial = data.tecnico_id ? 'Em Andamento' : 'Aberto';
 
-    // 🌟 VERIFIQUE SE ESSAS LINHAS ESTÃO LÁ:
-    const codigoProcesso = this._gerarCodigoProcesso(data.localizacao, data.tipo);
-    console.log("CÓDIGO GERADO ANTES DE SALVAR:", codigoProcesso); // Adicione isso para testar!
+    // 🌟 2. Passa os NOMES para a sua função, mantendo o padrão das siglas intacto!
+    const codigoProcesso = this._gerarCodigoProcesso(setor.nome, tipoEqp.nome);
 
     const newTicket = await ticketRepository.create({
       descricao_problema: data.descricao_problema,
@@ -102,11 +108,9 @@ class TicketService {
       status_chamado: statusInicial, 
       tecnico_id: data.tecnico_id || null,
       data_abertura: new Date(), 
-      codigo_processo: codigoProcesso // 👈 Garanta que ele está sendo passado aqui!
+      codigo_processo: codigoProcesso
     });
     
-    console.log("CHAMADO SALVO NO BANCO:", newTicket.toJSON()); // Adicione isso também!
-
     sseService.broadcast({ action: 'RELOAD_DATA' }); 
     return newTicket;
   }
@@ -165,17 +169,19 @@ class TicketService {
 
     if (data.patrimonio) {
       const equipmentDestino = await equipmentRepository.findByPatrimonio(data.patrimonio);
+      
+      // 🌟 Ajustado para usar os novos IDs (equipment_type_id e sector_id)
       if (!equipmentDestino) {
         await equipmentRepository.update(equipment_id, {
           patrimonio: data.patrimonio,
-          tipo: data.tipo,
-          observacao: data.localizacao,
+          equipment_type_id: data.equipment_type_id,
+          sector_id: data.sector_id,
           criado_por: 'Usuário (Via Chamado)'
         });
       } else {
         await equipmentRepository.update(equipmentDestino.id, {
-          tipo: data.tipo || equipmentDestino.tipo,
-          observacao: data.localizacao || equipmentDestino.observacao
+          equipment_type_id: data.equipment_type_id || equipmentDestino.equipment_type_id,
+          sector_id: data.sector_id || equipmentDestino.sector_id
         });
         equipment_id = equipmentDestino.id;
       }
@@ -184,7 +190,7 @@ class TicketService {
     const updatePayload = { 
       descricao_problema: data.descricao_problema,
       equipment_id,
-      resolucao_ti // Grava a resolução com o diálogo atualizado
+      resolucao_ti 
     };
 
     if ('tecnico_id' in data) {

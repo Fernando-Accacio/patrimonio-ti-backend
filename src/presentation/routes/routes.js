@@ -3,6 +3,7 @@ const equipmentController = require('../controllers/handlers/equipment.controlle
 const ticketController = require('../controllers/handlers/ticket.controller');
 const { authenticate, isAdmin, isTi } = require('../../core/middleware/auth.middleware');
 const sseService = require('../../application/services/sse.service');
+const { Sector, EquipmentType } = require('../../infra/db/sequelize/models');
 
 // IMPORTANDO OS SCHEMAS ENXUTOS 🚀
 const schemas = require('../schemas/api.schemas');
@@ -32,6 +33,17 @@ const routes = async (fastify, options) => {
   fastify.get('/password-resets/history', { preHandler: [authenticate, isAdmin], schema: { tags: ['Usuários'] } }, userController.getResetHistory.bind(userController));
   fastify.post('/password-resets/:id/approve', { preHandler: [authenticate, isAdmin], schema: schemas.approveResetSchema }, userController.approveReset.bind(userController));
   fastify.post('/password-resets/:id/reject', { preHandler: [authenticate, isAdmin], schema: schemas.rejectResetSchema }, userController.rejectReset.bind(userController));
+
+  fastify.get('/sectors', { preHandler: [authenticate] }, async (req, reply) => {
+  const setores = await Sector.findAll({ order: [['nome', 'ASC']] });
+  return reply.send(setores);
+});
+
+fastify.get('/equipment-types', { preHandler: [authenticate] }, async (req, reply) => {
+  const tipos = await EquipmentType.findAll({ order: [['nome', 'ASC']] });
+  return reply.send(tipos);
+});
+
 
   // ==========================================
   // ROTAS DE EQUIPAMENTOS

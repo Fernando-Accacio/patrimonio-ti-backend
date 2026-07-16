@@ -14,9 +14,9 @@ const equipmentSchema = {
   properties: {
     id: { type: 'integer' },
     patrimonio: { type: 'string', maxLength: 11 },
-    tipo: { type: 'string' },
+    equipment_type_id: { type: 'integer', nullable: true }, // 🌟 Permite a saída do novo ID
+    sector_id: { type: 'integer', nullable: true },         // 🌟 Permite a saída do novo ID
     status: { type: 'string' },
-    observacao: { type: 'string', nullable: true },
     criado_por: { type: 'string', nullable: true },
     createdAt: { type: 'string' },
     updatedAt: { type: 'string' }
@@ -392,12 +392,12 @@ const openTicketSchema = {
   tags: ['Chamados'],
   body: {
     type: 'object',
-    required: ['patrimonio', 'descricao_problema', 'tipo', 'localizacao'],
+    required: ['patrimonio', 'descricao_problema', 'equipment_type_id', 'sector_id'], // Mudou aqui
     properties: {
       patrimonio: { type: 'string', maxLength: 11 },
       descricao_problema: { type: 'string' },
-      tipo: { type: 'string' },        
-      localizacao: { type: 'string' },
+      equipment_type_id: { type: 'integer' }, // Mudou aqui
+      sector_id: { type: 'integer' },         // Mudou aqui
       tecnico_id: { type: 'integer', nullable: true }
     }
   },
@@ -418,13 +418,16 @@ const updateTicketSchema = {
   },
   body: {
     type: 'object',
-    required: ['descricao_problema', 'patrimonio', 'tipo', 'localizacao'],
+    // 🌟 1. Tirei os IDs daqui da lista de obrigatórios
+    required: ['descricao_problema', 'patrimonio'], 
     properties: {
       descricao_problema: { type: 'string' },
       patrimonio: { type: 'string', maxLength: 11 },
-      tipo: { type: 'string' },        
-      localizacao: { type: 'string' },
-      tecnico_id: { type: 'integer', nullable: true }
+      // 🌟 2. Adicionei "nullable: true" para aceitar os chamados antigos do banco
+      equipment_type_id: { type: 'integer', nullable: true }, 
+      sector_id: { type: 'integer', nullable: true },         
+      tecnico_id: { type: 'integer', nullable: true },
+      resposta_observacao: { type: 'string', nullable: true } // Garantindo que a resposta passe lisa
     }
   },
   response: {
