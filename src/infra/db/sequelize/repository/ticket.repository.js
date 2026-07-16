@@ -6,11 +6,8 @@ class TicketRepository {
   }
 
   async findAll() {
-    // 🌟 ESPIÃO: Isso vai imprimir no terminal do backend exatamente as colunas que o Node reconhece
-    console.log("=== COLUNAS QUE O NODE ESTÁ LENDO ===", Object.keys(Ticket.rawAttributes));
 
     return await Ticket.findAll({
-      // 🌟 FORÇA BRUTA: Declarando o array explícito com a coluna nova
       attributes: [
         'id', 'descricao_problema', 'status_chamado', 'resolucao_ti', 
         'data_abertura', 'equipment_id', 'user_id', 'tecnico_id', 
@@ -30,7 +27,6 @@ class TicketRepository {
 
   async findById(id) {
     return await Ticket.findByPk(id, {
-      // 🌟 REMOVEMOS O 'attributes' daqui também
       include: [
         { model: Equipment, as: 'equipment' },
         { 

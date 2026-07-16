@@ -124,7 +124,8 @@ const loginSchema = {
             nome: { type: 'string' },
             email: { type: 'string' },
             role: { type: 'string' },
-            ramal: { type: 'string' }
+            ramal: { type: 'string' },
+            matricula: { type: 'string', nullable: true } // 🌟 adicionado
           }
         }
       }
@@ -162,7 +163,8 @@ const listAllUsersSchema = {
           nome: { type: 'string' },
           email: { type: 'string' },
           role: { type: 'string' },
-          ramal: { type: 'string' } // 🌟 LIBERADO: Ramal na listagem geral para o dropdown do Admin
+          ramal: { type: 'string' },
+          matricula: { type: 'string', nullable: true }
         }
       }
     },

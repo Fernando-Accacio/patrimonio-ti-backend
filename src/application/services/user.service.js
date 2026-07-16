@@ -32,8 +32,15 @@ class UserService {
       throw new Error("O número do ramal deve conter de 1 a 11 dígitos.");
     }
 
+    // 3. Validar se a matrícula foi enviada
+    const matriculaLimpa = String(data.matricula || "").trim();
+    if (!matriculaLimpa) {
+      throw new Error("A matrícula é obrigatória para o cadastro.");
+    }
+
     data.email = encryptEmail(emailLimpo);
     data.ramal = ramalLimpo;
+    data.matricula = matriculaLimpa;
     const senhaGerada = gerarSenhaAutomatica();
     data.senha = await bcrypt.hash(senhaGerada, 10);
 
@@ -42,8 +49,12 @@ class UserService {
       console.log(`[DEV] Usuário criado! Senha automática: ${senhaGerada}`);
       return novoUser;
     } catch (error) {
-      if (error.name === "SequelizeUniqueConstraintError")
+      if (error.name === "SequelizeUniqueConstraintError") {
+        // Verifica qual campo causou o erro de duplicidade
+        const campoDuplicado = error.errors[0].path;
+        if (campoDuplicado === 'matricula') throw new Error("Esta matrícula já está em uso por outro usuário.");
         throw new Error("E-mail já cadastrado.");
+      }
       throw error;
     }
   }
@@ -67,8 +78,6 @@ class UserService {
       { expiresIn: "8h" },
     );
 
-    // 🌟 CORREÇÃO: Removemos o 'ofuscarEmail' daqui para o dono da conta ver seu próprio e-mail!
-    // Aproveitei e deixei o 'ramal' mapeado também para preencher a sua modal se precisar.
     return {
       token,
       user: {
@@ -77,6 +86,7 @@ class UserService {
         email: decryptEmail(user.email), // 🔓 Agora descriptografa puro para o próprio usuário
         role: user.role,
         ramal: user.ramal,
+        matricula: user.matricula, // 🌟 Retornando a matrícula no login
       },
     };
   }
@@ -88,7 +98,8 @@ class UserService {
       nome: u.nome,
       email: ofuscarEmail(decryptEmail(u.email)),
       role: u.role,
-      ramal: u.ramal, // 🌟 ADICIONE ESTA LINHA PARA LIBERAR O RAMAL NA LISTA GERAL!
+      ramal: u.ramal, 
+      matricula: u.matricula, // 🌟 Retornando para a lista geral
     }));
   }
 
@@ -178,8 +189,15 @@ class UserService {
       throw new Error("Solicitação não encontrada.");
     }
 
-    // 🌟 Substituído: Atualiza a linha no banco de dados
+    const user = await userRepository.findById(solicitacao.userId);
+
     await passwordResetRepository.updateStatus(resetId, "Recusado");
+
+    const nomeUsuario = user ? user.nome : "Desconhecido";
+    console.log(
+      `[DEV] ❌ Solicitação de alteração de senha de ${nomeUsuario} foi RECUSADA pelo Admin. Entrar em contato com a TI`
+    );
+
     return true;
   }
 
