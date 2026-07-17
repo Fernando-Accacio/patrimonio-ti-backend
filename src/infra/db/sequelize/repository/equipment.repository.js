@@ -2,12 +2,12 @@ const { Equipment } = require("../models");
 
 class EquipmentRepository {
   async create(equipmentData) {
-    // Ajustado: Mapeamento explícito para o ORM salvar a nova coluna no banco de dados
+    // 🌟 CORREÇÃO: Agora o Repository recebe os IDs e manda o Sequelize salvar!
     return await Equipment.create({
       patrimonio: equipmentData.patrimonio,
-      tipo: equipmentData.tipo,
+      equipment_type_id: equipmentData.equipment_type_id, // 🌟 AQUI O TIPO
+      sector_id: equipmentData.sector_id,                 // 🌟 E AQUI O SETOR
       status: equipmentData.status,
-      observacao: equipmentData.observacao,
       criado_por: equipmentData.criado_por 
     });
   }

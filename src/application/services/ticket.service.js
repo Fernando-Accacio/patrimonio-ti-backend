@@ -76,7 +76,7 @@ class TicketService {
   }
 
   async openTicket(data) {
-    // 🌟 1. Busca os dados reais no banco usando os IDs enviados pelo front
+    // 1. Busca os dados reais para validar
     const setor = await Sector.findByPk(data.sector_id);
     const tipoEqp = await EquipmentType.findByPk(data.equipment_type_id);
 
@@ -85,20 +85,24 @@ class TicketService {
     let equipment = await equipmentRepository.findByPatrimonio(data.patrimonio);
     
     if (!equipment) {
+      // 🌟 CORREÇÃO: Cria o equipamento associando explicitamente os IDs numéricos recebidos do front
       equipment = await equipmentRepository.create({
         patrimonio: data.patrimonio,
-        equipment_type_id: data.equipment_type_id, // 🌟 Salva o ID da FK
-        sector_id: data.sector_id,                 // 🌟 Salva o ID da FK
+        equipment_type_id: Number(data.equipment_type_id), // Define a chave estrangeira do tipo
+        sector_id: Number(data.sector_id),                 // Define a chave estrangeira do setor
         status: 'Em Manutenção',
         criado_por: 'Usuário (Via Chamado)'
       });
     } else {
-      await equipmentRepository.update(equipment.id, { status: 'Em Manutenção' });
+      // 🌟 CORREÇÃO: Se já existir, atualiza com o setor e tipo informados na hora da abertura
+      await equipmentRepository.update(equipment.id, { 
+        status: 'Em Manutenção',
+        equipment_type_id: Number(data.equipment_type_id),
+        sector_id: Number(data.sector_id)
+      });
     }
 
     const statusInicial = data.tecnico_id ? 'Em Andamento' : 'Aberto';
-
-    // 🌟 2. Passa os NOMES para a sua função, mantendo o padrão das siglas intacto!
     const codigoProcesso = this._gerarCodigoProcesso(setor.nome, tipoEqp.nome);
 
     const newTicket = await ticketRepository.create({
@@ -144,65 +148,26 @@ class TicketService {
   }
 
   async getAllTickets() {
-    return await ticketRepository.findAll();
-  }
+    const db = require('../../infra/db/sequelize/models');
+    
+    // 🌟 Mesma mágica que fizemos pro cliente, mas agora buscando TODOS os chamados
+    const chamados = await db.Ticket.findAll({ 
+      include: [
+        { 
+          model: db.Equipment, 
+          as: 'equipment',
+          include: [
+            { model: db.EquipmentType, as: 'equipmentType', attributes: ['id', 'nome', 'prefixo'] },
+            { model: db.Sector, as: 'sector', attributes: ['id', 'nome', 'prefixo'] }
+          ]
+        },
+        { model: db.User, as: 'user', attributes: ['id', 'nome', 'email', 'ramal'], paranoid: false },
+        { model: db.User, as: 'tecnico', attributes: ['id', 'nome', 'email', 'ramal'], paranoid: false }
+      ],
+      order: [['createdAt', 'DESC']]
+    });
 
-  async updateTicketInfo(id, data, userId, role) {
-    const ticket = await this._buscarChamadoOuFalhar(id);
-    const isAdmin = String(role || '').trim().toUpperCase() === 'ADMIN';
-
-    if (!isAdmin && ticket.user_id !== userId) {
-      throw new Error('Acesso negado: apenas o solicitante pode editar este chamado.');
-    }
-
-    if (['Concluído', 'Baixa'].includes(ticket.status_chamado)) {
-      throw new Error('Operação negada: Chamados finalizados não podem ser editados.');
-    }
-
-    // 🌟 CAPTURA E SALVA A RESPOSTA DO USUÁRIO NO HISTÓRICO DE RESOLUÇÃO
-    let resolucao_ti = ticket.resolucao_ti || '';
-    if (data.resposta_observacao) {
-      resolucao_ti += `\n\n[CONFIRMAÇÃO DO USUÁRIO]: ${data.resposta_observacao}`;
-    }
-
-    let equipment_id = ticket.equipment_id;
-
-    if (data.patrimonio) {
-      const equipmentDestino = await equipmentRepository.findByPatrimonio(data.patrimonio);
-      
-      // 🌟 Ajustado para usar os novos IDs (equipment_type_id e sector_id)
-      if (!equipmentDestino) {
-        await equipmentRepository.update(equipment_id, {
-          patrimonio: data.patrimonio,
-          equipment_type_id: data.equipment_type_id,
-          sector_id: data.sector_id,
-          criado_por: 'Usuário (Via Chamado)'
-        });
-      } else {
-        await equipmentRepository.update(equipmentDestino.id, {
-          equipment_type_id: data.equipment_type_id || equipmentDestino.equipment_type_id,
-          sector_id: data.sector_id || equipmentDestino.sector_id
-        });
-        equipment_id = equipmentDestino.id;
-      }
-    }
-
-    const updatePayload = { 
-      descricao_problema: data.descricao_problema,
-      equipment_id,
-      resolucao_ti 
-    };
-
-    if ('tecnico_id' in data) {
-      updatePayload.tecnico_id = data.tecnico_id;
-      if (ticket.status_chamado === 'Aberto' && data.tecnico_id) {
-        updatePayload.status_chamado = 'Em Andamento';
-      }
-    }
-
-    const updated = await ticketRepository.update(id, updatePayload);
-    sseService.broadcast({ action: 'RELOAD_DATA' });
-    return updated;
+    return JSON.parse(JSON.stringify(chamados));
   }
 
   async updateTicketStatus(id, status_chamado, resolucao_ti, usuario_logado_id) {
@@ -246,14 +211,22 @@ class TicketService {
 
     if (aprovado) {
       const comentarioConfirmacao = motivo?.trim();
+      
+      // 🌟 GARANTE QUE O HISTÓRICO ANTERIOR É PRESERVADO SEM SUMIR
+      let historicoCompleto = ticket.resolucao_ti || '';
+      
+      if (comentarioConfirmacao) {
+        historicoCompleto += `\n\n[CONFIRMADO PELO USUÁRIO]: ${comentarioConfirmacao}`;
+      } else {
+        historicoCompleto += `\n\n[CONFIRMADO PELO USUÁRIO]: Solução aceita pelo solicitante.`;
+      }
+
       payload = {
         status_chamado: 'Concluído',
         confirmed_by: userId,
         finished_by: ticket.finished_by,
         finished_at: ticket.finished_at,
-        resolucao_ti: comentarioConfirmacao
-          ? `${ticket.resolucao_ti || ''}\n\n[CONFIRMAÇÃO DO USUÁRIO]: ${comentarioConfirmacao}`
-          : ticket.resolucao_ti
+        resolucao_ti: historicoCompleto.trim()
       };
     } else {
       payload = {
@@ -276,33 +249,32 @@ class TicketService {
     return updatedTicket;
   }
 
-  async getMyTickets(userId, role) {
-    const { Ticket, Equipment, User } = require('../../infra/db/sequelize/models');
+async getMyTickets(userId, role) {
+    const db = require('../../infra/db/sequelize/models');
     const { Op } = require('sequelize');
-    
+
     const whereCondition = role === 'TECH' 
       ? { [Op.or]: [{ tecnico_id: userId }, { user_id: userId }] }
       : { user_id: userId };
 
-    return await Ticket.findAll({ 
+    const chamados = await db.Ticket.findAll({ 
       where: whereCondition,
       include: [
-        { model: Equipment, as: 'equipment' },
         { 
-          model: User, 
-          as: 'user', 
-          attributes: ['id', 'nome', 'email', 'ramal'],
-          paranoid: false 
+          model: db.Equipment, 
+          as: 'equipment',
+          include: [
+            { model: db.EquipmentType, as: 'equipmentType', attributes: ['id', 'nome', 'prefixo'] },
+            { model: db.Sector, as: 'sector', attributes: ['id', 'nome', 'prefixo'] }
+          ]
         },
-        { 
-          model: User, 
-          as: 'tecnico', 
-          attributes: ['id', 'nome', 'email', 'ramal'],
-          paranoid: false 
-        }
+        { model: db.User, as: 'user', attributes: ['id', 'nome', 'email', 'ramal'], paranoid: false },
+        { model: db.User, as: 'tecnico', attributes: ['id', 'nome', 'email', 'ramal'], paranoid: false }
       ],
       order: [['createdAt', 'DESC']]
     });
+
+    return JSON.parse(JSON.stringify(chamados));
   }
 
   async assignTechnician(id, tecnico_id) {

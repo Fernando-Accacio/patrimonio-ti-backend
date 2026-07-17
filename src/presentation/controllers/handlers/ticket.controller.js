@@ -34,8 +34,13 @@ class TicketController {
 
   async listMyTickets(req, res) {
     try {
-      // Toda a query complexa agora roda limpa dentro do Service!
       const tickets = await ticketService.getMyTickets(req.user.id, req.user.role);
+      
+      // 🌟 O RAIO-X: Vai imprimir o primeiro equipamento no terminal do VSCode!
+      if (tickets.length > 0) {
+        console.log("👉 EQUIPAMENTO QUE VAI PRO FRONT:", JSON.stringify(tickets[0].equipment, null, 2));
+      }
+      
       return res.status(200).send(tickets);
     } catch (e) { return res.status(500).send({ error: e.message }); }
   }

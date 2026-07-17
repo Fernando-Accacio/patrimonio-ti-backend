@@ -14,12 +14,31 @@ const equipmentSchema = {
   properties: {
     id: { type: 'integer' },
     patrimonio: { type: 'string', maxLength: 11 },
-    equipment_type_id: { type: 'integer', nullable: true }, // 🌟 Permite a saída do novo ID
-    sector_id: { type: 'integer', nullable: true },         // 🌟 Permite a saída do novo ID
+    equipment_type_id: { type: 'integer', nullable: true },
+    sector_id: { type: 'integer', nullable: true },        
     status: { type: 'string' },
     criado_por: { type: 'string', nullable: true },
     createdAt: { type: 'string' },
-    updatedAt: { type: 'string' }
+    updatedAt: { type: 'string' },
+    // 🌟 A CURA DO BUG: O Fastify agora tem permissão para enviar esses objetos!
+    equipmentType: {
+      type: 'object',
+      nullable: true,
+      properties: {
+        id: { type: 'integer' },
+        nome: { type: 'string' },
+        prefixo: { type: 'string' }
+      }
+    },
+    sector: {
+      type: 'object',
+      nullable: true,
+      properties: {
+        id: { type: 'integer' },
+        nome: { type: 'string' },
+        prefixo: { type: 'string' }
+      }
+    }
   }
 };
 

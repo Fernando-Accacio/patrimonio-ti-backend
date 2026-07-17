@@ -57,7 +57,7 @@ fastify.get('/equipment-types', { preHandler: [authenticate] }, async (req, repl
   // ROTAS DE CHAMADOS (TICKETS)
   // ==========================================
   fastify.get('/tickets', { preHandler: [authenticate], schema: schemas.listAllTicketsSchema }, ticketController.listAll.bind(ticketController));
-  fastify.get('/tickets/me', { preHandler: [authenticate], schema: schemas.listMyTicketsSchema }, ticketController.listMyTickets.bind(ticketController));
+  fastify.get('/tickets/me', { preHandler: [authenticate] }, ticketController.listMyTickets.bind(ticketController));
   fastify.post('/tickets', { preHandler: [authenticate], schema: schemas.openTicketSchema }, ticketController.open.bind(ticketController));
   fastify.put('/tickets/:id', { preHandler: [authenticate], schema: schemas.updateTicketSchema }, ticketController.update.bind(ticketController));
 

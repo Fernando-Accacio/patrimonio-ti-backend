@@ -4,7 +4,8 @@ const { Model } = require('sequelize');
 module.exports = (sequelize, DataTypes) => {
   class Sector extends Model {
     static associate(models) {
-      Sector.hasMany(models.Equipment, { foreignKey: 'sector_id', as: 'equipments' });
+      // 🌟 Relação reversa blindada
+      Sector.hasMany(sequelize.models.Equipment, { foreignKey: 'sector_id', as: 'equipments' });
     }
   }
   Sector.init({
@@ -21,7 +22,7 @@ module.exports = (sequelize, DataTypes) => {
   }, {
     sequelize,
     modelName: 'Sector',
-    tableName: 'Sectors'
+    tableName: 'sectors' // Verifique se no banco está Sectors ou sectors
   });
   return Sector;
 };

@@ -4,11 +4,10 @@ const { Model } = require('sequelize');
 module.exports = (sequelize, DataTypes) => {
   class Equipment extends Model {
     static associate(models) {
-      Equipment.hasMany(models.Ticket, { foreignKey: 'equipment_id', as: 'tickets' });
-      
-      // 🌟 Declarando as novas relações para o Sequelize entender
-      Equipment.belongsTo(models.Sector, { foreignKey: 'sector_id', as: 'sector' });
-      Equipment.belongsTo(models.EquipmentType, { foreignKey: 'equipment_type_id', as: 'equipmentType' });
+      // 🌟 Usando sequelize.models para evitar undefined por ordem de importação
+      Equipment.hasMany(sequelize.models.Ticket, { foreignKey: 'equipment_id', as: 'tickets' });
+      Equipment.belongsTo(sequelize.models.Sector, { foreignKey: 'sector_id', as: 'sector' });
+      Equipment.belongsTo(sequelize.models.EquipmentType, { foreignKey: 'equipment_type_id', as: 'equipmentType' });
     }
   }
   Equipment.init({
@@ -20,7 +19,7 @@ module.exports = (sequelize, DataTypes) => {
   }, {
     sequelize,
     modelName: 'Equipment',
-    tableName: 'Equipment',
+    tableName: 'equipment', // Se no seu banco a tabela estiver minúscula (equipment), ajuste aqui
     paranoid: true
   });
   return Equipment;
