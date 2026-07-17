@@ -148,26 +148,65 @@ class TicketService {
   }
 
   async getAllTickets() {
-    const db = require('../../infra/db/sequelize/models');
-    
-    // 🌟 Mesma mágica que fizemos pro cliente, mas agora buscando TODOS os chamados
-    const chamados = await db.Ticket.findAll({ 
-      include: [
-        { 
-          model: db.Equipment, 
-          as: 'equipment',
-          include: [
-            { model: db.EquipmentType, as: 'equipmentType', attributes: ['id', 'nome', 'prefixo'] },
-            { model: db.Sector, as: 'sector', attributes: ['id', 'nome', 'prefixo'] }
-          ]
-        },
-        { model: db.User, as: 'user', attributes: ['id', 'nome', 'email', 'ramal'], paranoid: false },
-        { model: db.User, as: 'tecnico', attributes: ['id', 'nome', 'email', 'ramal'], paranoid: false }
-      ],
-      order: [['createdAt', 'DESC']]
-    });
+    return await ticketRepository.findAll();
+  }
 
-    return JSON.parse(JSON.stringify(chamados));
+  async updateTicketInfo(id, data, userId, role) {
+    const ticket = await this._buscarChamadoOuFalhar(id);
+    const isAdmin = String(role || '').trim().toUpperCase() === 'ADMIN';
+
+    if (!isAdmin && ticket.user_id !== userId) {
+      throw new Error('Acesso negado: apenas o solicitante pode editar este chamado.');
+    }
+
+    if (['Concluído', 'Baixa'].includes(ticket.status_chamado)) {
+      throw new Error('Operação negada: Chamados finalizados não podem ser editados.');
+    }
+
+    // 🌟 CAPTURA E SALVA A RESPOSTA DO USUÁRIO NO HISTÓRICO DE RESOLUÇÃO
+    let resolucao_ti = ticket.resolucao_ti || '';
+    if (data.resposta_observacao) {
+      resolucao_ti += `\n\n[CONFIRMAÇÃO DO USUÁRIO]: ${data.resposta_observacao}`;
+    }
+
+    let equipment_id = ticket.equipment_id;
+
+    if (data.patrimonio) {
+      const equipmentDestino = await equipmentRepository.findByPatrimonio(data.patrimonio);
+      
+      // 🌟 Ajustado para usar os novos IDs (equipment_type_id e sector_id)
+      if (!equipmentDestino) {
+        await equipmentRepository.update(equipment_id, {
+          patrimonio: data.patrimonio,
+          equipment_type_id: data.equipment_type_id,
+          sector_id: data.sector_id,
+          criado_por: 'Usuário (Via Chamado)'
+        });
+      } else {
+        await equipmentRepository.update(equipmentDestino.id, {
+          equipment_type_id: data.equipment_type_id || equipmentDestino.equipment_type_id,
+          sector_id: data.sector_id || equipmentDestino.sector_id
+        });
+        equipment_id = equipmentDestino.id;
+      }
+    }
+
+    const updatePayload = { 
+      descricao_problema: data.descricao_problema,
+      equipment_id,
+      resolucao_ti 
+    };
+
+    if ('tecnico_id' in data) {
+      updatePayload.tecnico_id = data.tecnico_id;
+      if (ticket.status_chamado === 'Aberto' && data.tecnico_id) {
+        updatePayload.status_chamado = 'Em Andamento';
+      }
+    }
+
+    const updated = await ticketRepository.update(id, updatePayload);
+    sseService.broadcast({ action: 'RELOAD_DATA' });
+    return updated;
   }
 
   async updateTicketStatus(id, status_chamado, resolucao_ti, usuario_logado_id) {
