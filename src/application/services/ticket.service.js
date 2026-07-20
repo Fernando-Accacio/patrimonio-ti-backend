@@ -148,7 +148,25 @@ class TicketService {
   }
 
   async getAllTickets() {
-    return await ticketRepository.findAll();
+    const db = require('../../infra/db/sequelize/models');
+    
+    const chamados = await db.Ticket.findAll({ 
+      include: [
+        { 
+          model: db.Equipment, 
+          as: 'equipment',
+          include: [
+            { model: db.EquipmentType, as: 'equipmentType', attributes: ['id', 'nome', 'prefixo'] },
+            { model: db.Sector, as: 'sector', attributes: ['id', 'nome', 'prefixo'] }
+          ]
+        },
+        { model: db.User, as: 'user', attributes: ['id', 'nome', 'email', 'ramal'], paranoid: false },
+        { model: db.User, as: 'tecnico', attributes: ['id', 'nome', 'email', 'ramal'], paranoid: false }
+      ],
+      order: [['createdAt', 'DESC']]
+    });
+
+    return JSON.parse(JSON.stringify(chamados));
   }
 
   async updateTicketInfo(id, data, userId, role) {
