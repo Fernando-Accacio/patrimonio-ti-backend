@@ -47,4 +47,14 @@ const isTi = async (request, reply) => {
   }
 };
 
+const checkPrimeiraSenha = async (request, reply) => {
+  // Se a rota atual for a de trocar a senha ou de fazer logout, libera! 
+  // Senão, se ele ainda estiver com a primeira senha, bloqueia.
+  if (request.user?.primeira_senha && request.routerPath !== '/api/users/me/password') {
+    return reply.status(403).send({ 
+      error: ' Bloqueio: Altere sua senha provisória antes de acessar os recursos do sistema.' 
+    });
+  }
+};
+
 module.exports = { authenticate, isAdmin, isTi };

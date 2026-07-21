@@ -12,9 +12,11 @@ const {
 class UserService {
   async createUser(data) {
     const emailLimpo = data.email.trim().toLowerCase();
-    // if (!emailLimpo.endsWith("@itapecerica.sp.gov.br")) {
-    //   throw new Error("Acesso negado: O e-mail deve ser institucional (@itapecerica.sp.gov.br).");
-    // }
+    
+    // 🔒 TRAVA REATIVADA: Permite apenas e-mails institucionais
+    if (!emailLimpo.endsWith("@itapecerica.sp.gov.br")) {
+      throw new Error("Acesso negado: O e-mail deve ser institucional (@itapecerica.sp.gov.br).");
+    }
 
     const ramalLimpo = String(data.ramal || "").trim();
     if (!ramalLimpo) throw new Error("O número do ramal é obrigatório para o cadastro.");
@@ -23,27 +25,54 @@ class UserService {
     const matriculaLimpa = String(data.matricula || "").trim();
     if (!matriculaLimpa) throw new Error("A matrícula é obrigatória para o cadastro.");
 
-    data.email = encryptEmail(emailLimpo);
-    data.ramal = ramalLimpo;
-    data.matricula = matriculaLimpa;
+    const emailEncriptado = encryptEmail(emailLimpo);
     const senhaGerada = gerarSenhaAutomatica();
-    data.senha = await bcrypt.hash(senhaGerada, 10);
+    const senhaHash = await bcrypt.hash(senhaGerada, 10);
 
-    try {
-      const novoUser = await userRepository.create(data);
-      
-      // 🌟 DISPARA O E-MAIL DE BOAS-VINDAS
-      await emailService.enviarSenha(emailLimpo, data.nome, senhaGerada, false);
-      
-      return novoUser;
-    } catch (error) {
-      if (error.name === "SequelizeUniqueConstraintError") {
-        const campoDuplicado = error.errors[0].path;
-        if (campoDuplicado === 'matricula') throw new Error("Esta matrícula já está em uso por outro usuário.");
-        throw new Error("E-mail já cadastrado.");
-      }
-      throw error;
+    // 1. Busca se e-mail ou matrícula já existem no banco (incluindo inativos)
+    const existingEmailUser = await userRepository.findByEmailWithDeleted(emailEncriptado);
+    const existingMatriculaUser = await userRepository.findByMatriculaWithDeleted(matriculaLimpa);
+
+    // 2. Se existirem ATIVOS no sistema, bloqueia normalmente
+    if (existingEmailUser && !existingEmailUser.deletedAt) {
+      throw new Error("E-mail já cadastrado.");
     }
+    if (existingMatriculaUser && !existingMatriculaUser.deletedAt) {
+      throw new Error("Esta matrícula já está em uso por outro usuário.");
+    }
+
+    // 3. Se for um usuário deletado (Soft Delete), REATIVA e atualiza
+    const userToRestore = existingEmailUser || existingMatriculaUser;
+    let userFinal;
+
+    if (userToRestore && userToRestore.deletedAt) {
+      await userRepository.restore(userToRestore.id);
+      
+      userFinal = await userRepository.update(userToRestore.id, {
+        nome: data.nome,
+        email: emailEncriptado,
+        ramal: ramalLimpo,
+        matricula: matriculaLimpa,
+        role: data.role || 'USER',
+        senha: senhaHash,
+        primeira_senha: true
+      });
+    } else {
+      // 4. Se for um cadastro totalmente inédito, cria do zero
+      userFinal = await userRepository.create({
+        nome: data.nome,
+        email: emailEncriptado,
+        ramal: ramalLimpo,
+        matricula: matriculaLimpa,
+        role: data.role || 'USER',
+        senha: senhaHash,
+        primeira_senha: true
+      });
+    }
+
+    await emailService.enviarSenha(emailLimpo, data.nome, senhaGerada, false);
+
+    return userFinal;
   }
 
   async login(email, senha) {
@@ -71,6 +100,7 @@ class UserService {
         role: user.role,
         ramal: user.ramal,
         matricula: user.matricula,
+        primeira_senha: user.primeira_senha // 🌟 ADICIONADO AQUI!
       },
     };
   }
@@ -91,7 +121,11 @@ class UserService {
     if (!novaSenha || novaSenha.length < 6)
       throw new Error("A nova senha deve ter pelo menos 6 caracteres.");
     const hashedPassword = await bcrypt.hash(novaSenha, 10);
-    return await userRepository.update(id, { senha: hashedPassword });
+    
+    return await userRepository.update(id, { 
+      senha: hashedPassword, 
+      primeira_senha: false 
+    });
   }
 
   async requestPasswordReset(emailInput) {

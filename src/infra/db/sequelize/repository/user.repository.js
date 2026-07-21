@@ -9,6 +9,18 @@ class UserRepository {
     return await User.findOne({ where: { email } });
   }
 
+  async findByEmailWithDeleted(email) {
+    return await User.findOne({ where: { email }, paranoid: false });
+  }
+
+  async findByMatriculaWithDeleted(matricula) {
+    return await User.findOne({ where: { matricula }, paranoid: false });
+  }
+
+  async restore(id) {
+    return await User.restore({ where: { id } });
+  }
+
   async findById(id) {
     return await User.findByPk(id, { 
       attributes: { exclude: ['senha'] } 
@@ -19,13 +31,13 @@ class UserRepository {
     return await User.findAll({ attributes: { exclude: ['senha'] } });
   }
 
-  // NOVO MÉTODO: Ignora o bloqueio e traz a senha para validação do Bcrypt no login
   async findAllWithPassword() {
-    return await User.findAll(); // Traz todos os campos sem exclusão
+    return await User.findAll();
   }
 
   async update(id, updateData) {
-    return await User.update(updateData, { where: { id } });
+    await User.update(updateData, { where: { id }, paranoid: false });
+    return await User.findByPk(id, { paranoid: false });
   }
 
   async delete(id) {

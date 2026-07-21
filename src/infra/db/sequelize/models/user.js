@@ -13,6 +13,10 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.STRING,
       unique: true
     },
+    primeira_senha: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: true
+  },
     senha: DataTypes.STRING,
     role: DataTypes.STRING,
     ramal: DataTypes.STRING,

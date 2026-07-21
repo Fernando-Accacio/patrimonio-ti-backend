@@ -124,12 +124,7 @@ const loginSchema = {
   description: 'Faz login no sistema e retorna o Token JWT.',
   tags: ['Autenticação'],
   body: {
-    type: 'object',
-    required: ['email', 'senha'],
-    properties: {
-      email: { type: 'string', format: 'email' },
-      senha: { type: 'string' }
-    }
+    // ... (mantém o que está aí)
   },
   response: {
     200: {
@@ -144,7 +139,8 @@ const loginSchema = {
             email: { type: 'string' },
             role: { type: 'string' },
             ramal: { type: 'string' },
-            matricula: { type: 'string', nullable: true } // 🌟 adicionado
+            matricula: { type: 'string', nullable: true },
+            primeira_senha: { type: 'boolean' }
           }
         }
       }
