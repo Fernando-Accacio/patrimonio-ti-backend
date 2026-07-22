@@ -77,7 +77,16 @@ class UserService {
 
   async login(email, senha) {
     const allUsers = await userRepository.findAllWithPassword();
-    const user = allUsers.find((u) => decryptEmail(u.email) === email.toLowerCase().trim());
+    const emailBuscado = email.toLowerCase().trim();
+
+    // 🌟 Garante busca exata comparando e-mail descriptografado
+    const user = allUsers.find((u) => {
+      try {
+        return decryptEmail(u.email).toLowerCase().trim() === emailBuscado;
+      } catch (e) {
+        return false;
+      }
+    });
 
     if (!user) throw new Error("Usuário não encontrado.");
     if (!user.senha) throw new Error("Erro interno na autenticação. Contate o administrador.");
@@ -100,7 +109,7 @@ class UserService {
         role: user.role,
         ramal: user.ramal,
         matricula: user.matricula,
-        primeira_senha: user.primeira_senha // 🌟 ADICIONADO AQUI!
+        primeira_senha: user.primeira_senha
       },
     };
   }
