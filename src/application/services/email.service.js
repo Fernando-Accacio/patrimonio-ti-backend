@@ -16,7 +16,7 @@ class EmailService {
   async enviarSenha(para, nome, senha, isReset = false) {
     const assunto = isReset 
       ? 'Redefinição de Senha - Suporte TI Prefeitura' 
-      : 'Bem-vindo ao Sistema de Patrimônio TI - Prefeitura';
+      : 'Bem-vindo ao Sistema de Chamados TI - Prefeitura';
 
     const htmlTemplate = `
       <div style="font-family: Arial, sans-serif; color: #333; max-w: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;">
