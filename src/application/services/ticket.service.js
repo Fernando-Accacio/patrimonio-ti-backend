@@ -16,13 +16,15 @@ class TicketService {
   }
 
   // 🌟 FUNÇÃO AUXILIAR PARA GERAR O CÓDIGO DE PROCESSO
+  // 🌟 FUNÇÃO AUXILIAR PARA GERAR O CÓDIGO DE PROCESSO
   _gerarCodigoProcesso(setor, tipoEquipamento) {
     // Mapeamento de setores comuns para garantir siglas padronizadas
     const mapeamentoSetores = {
       'recursos humanos': 'RH',
       'tecnologia da informacao': 'TI',
-      'tecnologia da informação': 'TI',
       'financeiro': 'FIN',
+      'financas': 'FIN',
+      'secretaria de financas': 'FIN',
       'almoxarifado': 'ALM',
       'almoxarifado central': 'ALM',
       'comercial': 'COM',
@@ -31,9 +33,11 @@ class TicketService {
       'gabinete do prefeito': 'GAB',
       'gabinete': 'GAB',
       'saude': 'SAU',
-      'saúde': 'SAU',
+      'secretaria de saude': 'SAU',
+      'secretaria da saude': 'SAU',
       'educacao': 'EDU',
-      'educação': 'EDU'
+      'secretaria de educacao': 'EDU',
+      'secretaria da educacao': 'EDU'
     };
 
     const normalizedSetor = String(setor || '').trim().toLowerCase()
@@ -42,9 +46,12 @@ class TicketService {
     let siglaSetor = mapeamentoSetores[normalizedSetor];
     
     if (!siglaSetor) {
-      // Se for um setor customizado digitado, gera uma sigla inteligente com as primeiras letras
+      // Se for um setor customizado, ignora preposições para fazer uma sigla melhor
+      const palavrasIgnoradas = ['de', 'da', 'do', 'das', 'dos', 'e'];
+      
       siglaSetor = normalizedSetor
         .split(' ')
+        .filter(word => !palavrasIgnoradas.includes(word)) // Remove o "de", "da", etc.
         .map(word => word[0])
         .join('')
         .toUpperCase()
@@ -67,9 +74,8 @@ class TicketService {
     };
 
     const normalizedTipo = String(tipoEquipamento || '').trim().toLowerCase();
-    const inicialEquipamento = mapeamentoEquipamentos[normalizedTipo] || 'E'; // 'E' de equipamento genérico
+    const inicialEquipamento = mapeamentoEquipamentos[normalizedTipo] || 'E';
 
-    // Gera um número aleatório de 5 dígitos para garantir unicidade
     const numAleatorio = Math.floor(10000 + Math.random() * 90000);
 
     return `${siglaSetor}-${inicialEquipamento}${numAleatorio}`;
